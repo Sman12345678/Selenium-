@@ -34,7 +34,7 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-@app.route('/')
+@app.route('/a')
 def index():
     try:
         query = request.args.get("query")
