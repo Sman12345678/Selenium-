@@ -43,7 +43,7 @@ def index():
         if query:
             # Wait for the input box to be present
             time.sleep(2)  # May adjust with WebDriverWait for production use
-            input_box = driver.find_element(By.NAME, "input-field")
+            input_box = driver.find_element(By.CLASS_NAME, "input-field")
             input_box.clear()
             input_box.send_keys(query)
             input_box.send_keys(Keys.RETURN)
