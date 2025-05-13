@@ -21,7 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
-
+wait = WebDriverWait(driver, 10)
 
 app = Flask(__name__)
 
