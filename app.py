@@ -46,19 +46,23 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-def dismiss_popup(timeout=2):
+def dismiss_popup(timeout=1):
     try:
-        logging.info("Attempting to bypass popup")
         WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable((
                 By.CSS_SELECTOR,
                 ".text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline"
             ))
         ).click()
-        logging.info("Popup bypassed successfully")
-        time.sleep(1)
-    except Exception:
-        logging.debug("No popup to bypass")
+        logging.info("🎉 Popup found and dismissed")
+        time.sleep(1)  # Let DOM update after dismiss
+    except TimeoutException:
+        # Popup not found within timeout, no need to log this
+        pass
+    except Exception as e:
+        logging.warning(f"Unexpected error in dismiss_popup: {e}")
+
+
 def popup_watcher():
     while True:
         try:
