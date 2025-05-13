@@ -69,7 +69,7 @@ def ask():
 
 
                 # Click the send button
-                send_button = driver.find_element(By.CLASS_NAME, "composer-submit-button")
+                send_button = driver.find_element(By.ID, "composer-submit-button")
                 send_button.click()
             except NoSuchElementException:
                 return jsonify({"error": "Input field or send button not found"}), 400
