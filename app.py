@@ -38,7 +38,7 @@ driver = webdriver.Chrome(service=service, options=options)
 def dismiss_popup():
     try:
         # Try to find the popup and click it
-        popup = driver.find_element(By.CSS_SELECTOR, "text-token-text-secondary.mt-5.cursor-pointer.text-sm.Font-semibold.underline")
+        popup = driver.find_element(By.CSS_SELECTOR, "text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline")
         popup.click()
         time.sleep(1)  # Wait for the DOM to update
     except NoSuchElementException:
@@ -64,7 +64,7 @@ def ask():
         if query:
             try:
                 # Type the query into the ProseMirror editor
-                editor = driver.find_element(By.CSS_SELECTOR, "._prosemirror-parent_k4nam_2 .ProseMirror[contenteditable]")
+                editor = driver.find_element(By.ID, "prompt-textarea")
                 editor.send_keys(query)
 
 
