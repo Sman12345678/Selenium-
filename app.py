@@ -64,7 +64,7 @@ def ask():
         if query:
             try:
                 # Type the query into the ProseMirror editor
-                editor = driver.find_element(By.ID, "prompt-textarea")
+                editor = driver.find_element(By.CSS_SELECTOR, "._prosemirror-parent_k4nam_2 .ProseMirror[contenteditable]")
                 editor.send_keys(query)
 
 
