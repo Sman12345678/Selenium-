@@ -61,6 +61,7 @@ def ask():
         start_time = time.time()
         timeout = 10
         while time.time() - start_time < timeout:
+            time.sleep(0.5)
             dismiss_popup()  # Check periodically during the timeout
 
         if query:
