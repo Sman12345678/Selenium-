@@ -75,65 +75,58 @@ def popup_watcher():
 def ask():
     try:
         query = request.args.get("q")
-        driver.get("https://chatgpt.com")
+        driver.get("https://chaklo.com")
         time.sleep(5)
 
-        # Check and click the popup right after page load if it appears
+        # Attempt to dismiss popup once after loading
         dismiss_popup()
 
-        # Wait for the page to load, then click the popup repeatedly if it shows
-        start_time = time.time()
-        timeout = 10
-        while time.time() - start_time < timeout:
-            time.sleep(0.5)
-            dismiss_popup()  # Check periodically during the timeout
-
-        if query:
-            try:
-                # Type the query into the ProseMirror editor
-                editor = driver.find_element(By.ID, "prompt-textarea")
-                editor.send_keys(query)
-                logging.info("👉 passing query to box")
-
-
-                # Click the send button
-                send_button = driver.find_element(By.ID, "composer-submit-button")
-                send_button.click()
-                logging.info("🕵️ hitting  send button")
-            except NoSuchElementException:
-                return jsonify({"error": "Input field or send button not found"}), 400
-        else:
+        if not query:
             return jsonify({"error": "No query provided"}), 400
 
-        # Wait for a response to load
-        time.sleep(6)
-    
+        # Locate input field
+        try:
+            editor = driver.find_element(By.ID, "prompt-textarea")
+            editor.send_keys(query)
+            logging.info("✅ Query typed into input box")
+        except NoSuchElementException:
+            return jsonify({"error": "Input field not found"}), 400
 
-        # After submitting, check and click the popup again if it reappears
+        # Locate and click send button
+        try:
+            send_button = driver.find_element(By.ID, "composer-submit-button")
+            send_button.click()
+            logging.info("✅ Send button clicked")
+        except NoSuchElementException:
+            return jsonify({"error": "Send button not found"}), 400
+
+        # Wait for response to load
+        time.sleep(6)
         dismiss_popup()
 
+        # Parse response
         page = driver.page_source
         soup = BeautifulSoup(page, 'html.parser')
 
-        # Extract the paragraph from the updated div
         div = soup.find("div", class_="markdown prose dark:prose-invert w-full break-words dark")
-
         if div:
-            p = div.find("p")
-            if p:
-                logging.info("✅ response sent successfully")
-                return jsonify({"bot": p.text})
+            all_text = div.get_text(separator="\n").strip()
+            if all_text:
+                logging.info("✅ Response extracted successfully")
+                return jsonify({"bot": all_text})
             else:
-                return jsonify({"error": "Paragraph not found"}), 404
+                return jsonify({"error": "Response div found, but it's empty"}), 404
         else:
-            return jsonify({"error": "Target div not found"}), 404
+            return jsonify({"error": "Response container not found"}), 404
 
     except Exception as e:
+        logging.error(str(e))
         return jsonify({
-            "error": str(e),
+            "error": "Unexpected server error",
+            "details": str(e),
             "traceback": traceback.format_exc()
         }), 500
-        logging.error(str(e))
+
 
 
 @app.route('/quit')
