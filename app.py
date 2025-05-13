@@ -11,6 +11,8 @@ import traceback
 import time
 from bs4 import BeautifulSoup
 import logging
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # Set up basic logging configuration
 logging.basicConfig(
@@ -43,17 +45,26 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-def dismiss_popup():
+def dismiss_popup(timeout=2):
     try:
-        # Try to find the popup and click it
-        logging.info("attempting bypass")
-        popup = driver.find_element(By.CSS_SELECTOR, ".text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline")
-        popup.click()
-        logging.info("🎉pop up bypassed")
-        time.sleep(1)  # Wait for the DOM to update
-    except NoSuchElementException:
-        # If the popup doesn't appear, do nothing
-        pass
+        logging.info("Attempting to bypass popup")
+        WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable((
+                By.CSS_SELECTOR,
+                ".text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline"
+            ))
+        ).click()
+        logging.info("Popup bypassed successfully")
+        time.sleep(1)
+    except Exception:
+        logging.debug("No popup to bypass")
+def popup_watcher():
+    while True:
+        try:
+            dismiss_popup(timeout=1)
+        except Exception:
+            pass
+        time.sleep(1)  # Check once per second
 
 @app.route('/ask')
 def ask():
@@ -136,4 +147,5 @@ def quit_browser():
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
     print("Chromedriver version:", get_binary_version(chromedriver_bin))
+    threading.Thread(target=popup_watcher, daemon=True).start()
     app.run(host='0.0.0.0', port=10000)
