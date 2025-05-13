@@ -40,6 +40,7 @@ def dismiss_popup():
         # Try to find the popup and click it
         popup = driver.find_element(By.CSS_SELECTOR, "text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline")
         popup.click()
+        print("🎉pop up bypassed")
         time.sleep(1)  # Wait for the DOM to update
     except NoSuchElementException:
         # If the popup doesn't appear, do nothing
@@ -50,7 +51,7 @@ def ask():
     try:
         query = request.args.get("q")
         driver.get("https://chatgpt.com")
-        time.sleep(3)
+        time.sleep(5)
 
         # Check and click the popup right after page load if it appears
         dismiss_popup()
@@ -66,18 +67,21 @@ def ask():
                 # Type the query into the ProseMirror editor
                 editor = driver.find_element(By.CSS_SELECTOR, "._prosemirror-parent_k4nam_2 .ProseMirror[contenteditable]")
                 editor.send_keys(query)
+                print("👉 passing query to box")
 
 
                 # Click the send button
                 send_button = driver.find_element(By.ID, "composer-submit-button")
                 send_button.click()
+                print("🕵️ hitting  send button")
             except NoSuchElementException:
                 return jsonify({"error": "Input field or send button not found"}), 400
         else:
             return jsonify({"error": "No query provided"}), 400
 
         # Wait for a response to load
-        time.sleep(3)
+        time.sleep(6)
+    
 
         # After submitting, check and click the popup again if it reappears
         dismiss_popup()
@@ -91,6 +95,7 @@ def ask():
         if div:
             p = div.find("p")
             if p:
+                print("✅ response sent successfully")
                 return jsonify({"bot": p.text})
             else:
                 return jsonify({"error": "Paragraph not found"}), 404
