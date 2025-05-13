@@ -34,44 +34,73 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-@app.route('/a')
-def index():
+def dismiss_popup():
     try:
-        query = request.args.get("query")
-        driver.get("https://chat-with-kora.onrender.com/Kora.html")
+        # Try to find the popup and click it
+        popup = driver.find_element(By.CSS_SELECTOR, "text-token-text-secondary.mt-5.cursor-pointer.text-sm.Font-semibold.underline")
+        popup.click()
+        time.sleep(1)  # Wait for the DOM to update
+    except NoSuchElementException:
+        # If the popup doesn't appear, do nothing
+        pass
+
+@app.route('/ask')
+def ask():
+    try:
+        query = request.args.get("q")
+        driver.get("https://chatgpt.com")
+        time.sleep(3)
+
+        # Check and click the popup right after page load if it appears
+        dismiss_popup()
+
+        # Wait for the page to load, then click the popup repeatedly if it shows
+        start_time = time.time()
+        timeout = 10
+        while time.time() - start_time < timeout:
+            dismiss_popup()  # Check periodically during the timeout
 
         if query:
-            # Wait for the input box to be present
-            time.sleep(2)  # May adjust with WebDriverWait for production use
-            input_box = driver.find_element(By.CLASS_NAME, "input-field")
-            input_box.clear()
-            input_box.send_keys(query)
-            input_box.send_keys(Keys.RETURN)
+            try:
+                # Type the query into the ProseMirror editor
+                editor = driver.find_element(By.CLASS_NAME, "ProseMirror")
+                editor.send_keys(query)
 
-            # Wait for the response to appear (adjust time as needed)
-            time.sleep(10)
-            page_source = driver.page_source
-            soup = BeautifulSoup(page_source, "html.parser")
-
-            # Look for the latest bot message
-            messages = soup.select('.bot .message')
-            if messages:
-                ai_response = messages[-1].get_text(strip=True)
-            else:
-                ai_response = "Could not find AI response in page."
-
-            return jsonify({"query": query, "ai_response": ai_response})
-
+                # Click the send button
+                send_button = driver.find_element(By.CLASS_NAME, "composer-submit-button")
+                send_button.click()
+            except NoSuchElementException:
+                return jsonify({"error": "Input field or send button not found"}), 400
         else:
-            # If no query, just return the page title
-            title = driver.title
-            return jsonify({"title": title})
+            return jsonify({"error": "No query provided"}), 400
+
+        # Wait for a response to load
+        time.sleep(3)
+
+        # After submitting, check and click the popup again if it reappears
+        dismiss_popup()
+
+        page = driver.page_source
+        soup = BeautifulSoup(page, 'html.parser')
+
+        # Extract the paragraph from the updated div
+        div = soup.find("div", class_="markdown prose dark:prose-invert w-full break-words dark")
+
+        if div:
+            p = div.find("p")
+            if p:
+                return jsonify({"bot": p.text})
+            else:
+                return jsonify({"error": "Paragraph not found"}), 404
+        else:
+            return jsonify({"error": "Target div not found"}), 404
 
     except Exception as e:
         return jsonify({
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
 
 @app.route('/quit')
 def quit_browser():
