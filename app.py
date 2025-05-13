@@ -64,8 +64,9 @@ def ask():
         if query:
             try:
                 # Type the query into the ProseMirror editor
-                editor = driver.find_element(By.CLASS_NAME, "ProseMirror")
+                editor = driver.find_element(By.CSS_SELECTOR, "._prosemirror-parent_k4nam_2 .ProseMirror[contenteditable]")
                 editor.send_keys(query)
+
 
                 # Click the send button
                 send_button = driver.find_element(By.CLASS_NAME, "composer-submit-button")
