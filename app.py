@@ -38,7 +38,8 @@ driver = webdriver.Chrome(service=service, options=options)
 def dismiss_popup():
     try:
         # Try to find the popup and click it
-        popup = driver.find_element(By.CSS_SELECTOR, "text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline")
+        print("attempting bypass")
+        popup = driver.find_element(By.CSS_SELECTOR, ".text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline")
         popup.click()
         print("🎉pop up bypassed")
         time.sleep(1)  # Wait for the DOM to update
