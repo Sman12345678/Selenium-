@@ -10,6 +10,14 @@ import os
 import traceback
 import time
 from bs4 import BeautifulSoup
+import logging
+
+# Set up basic logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
 
 app = Flask(__name__)
 
@@ -38,10 +46,10 @@ driver = webdriver.Chrome(service=service, options=options)
 def dismiss_popup():
     try:
         # Try to find the popup and click it
-        print("attempting bypass")
+        logging.info("attempting bypass")
         popup = driver.find_element(By.CSS_SELECTOR, ".text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline")
         popup.click()
-        print("🎉pop up bypassed")
+        logging.info("🎉pop up bypassed")
         time.sleep(1)  # Wait for the DOM to update
     except NoSuchElementException:
         # If the popup doesn't appear, do nothing
@@ -67,15 +75,15 @@ def ask():
         if query:
             try:
                 # Type the query into the ProseMirror editor
-                editor = driver.find_element(By.CSS_SELECTOR, "._prosemirror-parent_k4nam_2 .ProseMirror[contenteditable]")
+                editor = driver.find_element(By.ID, "prompt-textarea")
                 editor.send_keys(query)
-                print("👉 passing query to box")
+                logging.info("👉 passing query to box")
 
 
                 # Click the send button
                 send_button = driver.find_element(By.ID, "composer-submit-button")
                 send_button.click()
-                print("🕵️ hitting  send button")
+                logging.info("🕵️ hitting  send button")
             except NoSuchElementException:
                 return jsonify({"error": "Input field or send button not found"}), 400
         else:
@@ -97,7 +105,7 @@ def ask():
         if div:
             p = div.find("p")
             if p:
-                print("✅ response sent successfully")
+                logging.info("✅ response sent successfully")
                 return jsonify({"bot": p.text})
             else:
                 return jsonify({"error": "Paragraph not found"}), 404
@@ -109,6 +117,7 @@ def ask():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+        logging.error(str(e))
 
 
 @app.route('/quit')
