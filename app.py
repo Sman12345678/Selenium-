@@ -47,7 +47,7 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-def dismiss_popup(timeout=1):
+def dismiss_popup(timeout=15):
     try:
         WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable((
