@@ -86,10 +86,23 @@ def ask():
             return jsonify({"error": "No query provided"}), 400
 
         # Locate input field
-        try:
-            wait = WebDriverWait(driver, 10)
-            editor = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ProseMirror[contenteditable='true']")))
-            editor.send_keys(query)
+       try:
+    wait = WebDriverWait(driver, 10)
+    editor = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ProseMirror[contenteditable='true']")))
+    editor.click()  # Focus the box
+
+    driver.execute_script("""
+        const editor = arguments[0];
+        const paragraph = editor.querySelector("p");
+        if (paragraph) {
+            paragraph.innerText = arguments[1];
+        } else {
+            const p = document.createElement("p");
+            p.innerText = arguments[1];
+            editor.appendChild(p);
+        }
+    """, editor, query)
+
             logging.info("✅ Query typed into input box")
         except NoSuchElementException:
             return jsonify({"error": "Input field not found"}), 400
