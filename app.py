@@ -56,7 +56,7 @@ def dismiss_popup(timeout=1):
             ))
         ).click()
         logging.info("🎉 Popup found and dismissed")
-        time.sleep(1)  # Let DOM update after dismiss
+        time.sleep(5)  # Let DOM update after dismiss
     except TimeoutException:
         # Popup not found within timeout, no need to log this
         pass
@@ -80,12 +80,12 @@ def setup_chatgpt_session():
         return
 
     driver.get("https://chatgpt.com")
-    time.sleep(5)
+    time.sleep(15)
 
     # Try dismissing popups (loop once or twice)
     for _ in range(3):
         dismiss_popup()
-        time.sleep(1)
+        time.sleep(5)
 
     setup_complete = True
     logging.info("✅ Initial setup completed")
@@ -104,7 +104,7 @@ def ask():
 
         # Focus and type into the editor
         wait = WebDriverWait(driver, 10)
-        editor = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ProseMirror[contenteditable='true']")))
+        editor = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id="prompt-textarea"]")))
         editor.click()
 
         # Inject the query into the editable area
