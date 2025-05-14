@@ -104,7 +104,7 @@ def ask():
 
         # Focus and type into the editor
         wait = WebDriverWait(driver, 10)
-        editor = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id="prompt-textarea"]")))
+        editor = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="prompt-textarea"]')))
         editor.click()
 
         # Inject the query into the editable area
