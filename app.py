@@ -85,6 +85,8 @@ def popup_watcher(max_retries=30):
 
 setup_complete = False
 
+threading.Thread(target=popup_watcher, daemon=True).start()
+
 def setup_chatgpt_session():
     global setup_complete
     if setup_complete:
@@ -102,10 +104,7 @@ def setup_chatgpt_session():
         time.sleep(5)
 
     if not popup_dismissed:
-        popup_dismissed = popup_watcher()
-
-    if not popup_dismissed:
-        raise PersistentPopupError("❌ Failed to dismiss popup after multiple attempts.")
+        logging.warning("⚠️ Popup was not found/dismissed during setup. Background watcher is running.")
 
     setup_complete = True
     logging.info("✅ Initial setup completed")
@@ -119,7 +118,7 @@ def ask():
         if not query:
             return jsonify({"error": "No query provided"}), 400
 
-        setup_chatgpt_session()  # Ensure we're ready
+        setup_chatgpt_session()  # Ensure setup is run only once
 
         # Focus and type into the editor
         wait = WebDriverWait(driver, 10)
@@ -171,24 +170,7 @@ def ask():
             "details": str(e),
             "traceback": traceback.format_exc()
         }), 500
-
-
-
-@app.route('/quit')
-def quit_browser():
-    global driver
-    try:
-        if driver:
-            driver.quit()
-            driver = None
-            return jsonify({"message": "Browser session quit."})
-        else:
-            return jsonify({"message": "No active browser session."}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
     print("Chromedriver version:", get_binary_version(chromedriver_bin))
-    threading.Thread(target=popup_watcher, daemon=True).start()
     app.run(host='0.0.0.0', port=10000)
