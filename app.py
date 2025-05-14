@@ -72,42 +72,55 @@ def popup_watcher():
             pass
         time.sleep(1)  # Check once per second
 
+setup_complete = False
+
+def setup_chatgpt_session():
+    global setup_complete
+    if setup_complete:
+        return
+
+    driver.get("https://chatgpt.com")
+    time.sleep(5)
+
+    # Try dismissing popups (loop once or twice)
+    for _ in range(3):
+        dismiss_popup()
+        time.sleep(1)
+
+    setup_complete = True
+    logging.info("✅ Initial setup completed")
+
+
 @app.route('/ask')
 def ask():
+    global setup_complete
+
     try:
         query = request.args.get("q")
-        driver.get("https://chatgpt.com")
-        time.sleep(5)
-
-        # Attempt to dismiss popup once after loading
-        dismiss_popup()
-
         if not query:
             return jsonify({"error": "No query provided"}), 400
 
-        # Locate input field
-       try:
-    wait = WebDriverWait(driver, 10)
-    editor = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ProseMirror[contenteditable='true']")))
-    editor.click()  # Focus the box
+        setup_chatgpt_session()  # Ensure we're ready
 
-    driver.execute_script("""
-        const editor = arguments[0];
-        const paragraph = editor.querySelector("p");
-        if (paragraph) {
-            paragraph.innerText = arguments[1];
-        } else {
-            const p = document.createElement("p");
-            p.innerText = arguments[1];
-            editor.appendChild(p);
-        }
-    """, editor, query)
+        # Focus and type into the editor
+        wait = WebDriverWait(driver, 10)
+        editor = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ProseMirror[contenteditable='true']")))
+        editor.click()
 
-            logging.info("✅ Query typed into input box")
-        except NoSuchElementException:
-            return jsonify({"error": "Input field not found"}), 400
+        # Inject the query into the editable area
+        driver.execute_script("""
+            const editor = arguments[0];
+            const paragraph = editor.querySelector("p");
+            if (paragraph) {
+                paragraph.innerText = arguments[1];
+            } else {
+                const p = document.createElement("p");
+                p.innerText = arguments[1];
+                editor.appendChild(p);
+            }
+        """, editor, query)
 
-        # Locate and click send button
+        # Click the send button
         try:
             send_button = driver.find_element(By.ID, "composer-submit-button")
             send_button.click()
@@ -115,11 +128,10 @@ def ask():
         except NoSuchElementException:
             return jsonify({"error": "Send button not found"}), 400
 
-        # Wait for response to load
+        # Wait and parse response
         time.sleep(6)
         dismiss_popup()
 
-        # Parse response
         page = driver.page_source
         soup = BeautifulSoup(page, 'html.parser')
 
@@ -127,7 +139,6 @@ def ask():
         if div:
             all_text = div.get_text(separator="\n").strip()
             if all_text:
-                logging.info("✅ Response extracted successfully")
                 return jsonify({"bot": all_text})
             else:
                 return jsonify({"error": "Response div found, but it's empty"}), 404
@@ -135,7 +146,7 @@ def ask():
             return jsonify({"error": "Response container not found"}), 404
 
     except Exception as e:
-        logging.error(str(e))
+        logging.error("❌ Error in /ask endpoint", exc_info=True)
         return jsonify({
             "error": "Unexpected server error",
             "details": str(e),
