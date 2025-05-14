@@ -88,7 +88,7 @@ def ask():
         # Locate input field
         try:
             wait = WebDriverWait(driver, 10)
-            editor = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div#prompt-textarea.ProseMirror[contenteditable='true']")))
+            editor = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ProseMirror[contenteditable='true']")))
             editor.send_keys(query)
             logging.info("✅ Query typed into input box")
         except NoSuchElementException:
