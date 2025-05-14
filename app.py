@@ -76,7 +76,7 @@ def popup_watcher():
 def ask():
     try:
         query = request.args.get("q")
-        driver.get("https://chaklo.com")
+        driver.get("https://chatgpt.com")
         time.sleep(5)
 
         # Attempt to dismiss popup once after loading
