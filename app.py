@@ -47,6 +47,10 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
+class PersistentPopupError(Exception):
+    """Raised when popup cannot be dismissed after several attempts."""
+    pass
+
 def dismiss_popup(timeout=15):
     try:
         WebDriverWait(driver, timeout).until(
@@ -56,21 +60,28 @@ def dismiss_popup(timeout=15):
             ))
         ).click()
         logging.info("🎉 Popup found and dismissed")
-        time.sleep(5)  # Let DOM update after dismiss
+        time.sleep(2)  # Let DOM update after dismiss
+        return True
     except TimeoutException:
-        # Popup not found within timeout, no need to log this
-        pass
+        logging.warning(f"⚠️ Popup not found within timeout ({timeout}s)")
+        return False
     except Exception as e:
-        logging.warning(f"Unexpected error in dismiss_popup: {e}")
+        logging.error(f"❌ Unexpected error in dismiss_popup: {e}")
+        return False
 
-
-def popup_watcher():
-    while True:
-        try:
-            dismiss_popup(timeout=1)
-        except Exception:
-            pass
-        time.sleep(1)  # Check once per second
+def popup_watcher(max_retries=30):
+    """Continuously tries to dismiss a popup for a maximum number of retries."""
+    logging.info("🔍 Starting popup watcher...")
+    retries = 0
+    while retries < max_retries:
+        success = dismiss_popup(timeout=1)
+        if success:
+            logging.info("✅ Popup dismissed by popup_watcher")
+            return True
+        retries += 1
+        time.sleep(1)
+    logging.error(f"🚨 Popup could not be dismissed after {max_retries} retries")
+    return False
 
 setup_complete = False
 
@@ -79,17 +90,25 @@ def setup_chatgpt_session():
     if setup_complete:
         return
 
+    logging.info("🌐 Navigating to ChatGPT")
     driver.get("https://chatgpt.com")
-    time.sleep(15)
+    time.sleep(15)  # Wait for full page load
 
-    # Try dismissing popups (loop once or twice)
-    for _ in range(3):
-        dismiss_popup()
+    popup_dismissed = False
+    for attempt in range(3):
+        if dismiss_popup(timeout=10):
+            popup_dismissed = True
+            break
         time.sleep(5)
+
+    if not popup_dismissed:
+        popup_dismissed = popup_watcher()
+
+    if not popup_dismissed:
+        raise PersistentPopupError("❌ Failed to dismiss popup after multiple attempts.")
 
     setup_complete = True
     logging.info("✅ Initial setup completed")
-
 
 @app.route('/ask')
 def ask():
