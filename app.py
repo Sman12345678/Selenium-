@@ -80,7 +80,7 @@ def popup_watcher(max_retries=30):
     logging.info("🔍 Starting popup watcher...")
     retries = 0
     while retries < max_retries:
-        success = dismiss_popup(timeout=1)
+        success = dismiss_popup(timeout=15)
         if success:
             logging.info("✅ Popup dismissed by popup_watcher")
             return True
