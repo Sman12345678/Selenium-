@@ -168,6 +168,7 @@ def ask():
         })();
         """
         driver.execute_script(script, query)
+        logging.info("✍️ Box Found, Typing.....")
 
         # Wait before polling for response
         time.sleep(1)
