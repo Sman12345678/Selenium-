@@ -147,45 +147,54 @@ def ask():
 
         setup_chatgpt_session()  # Ensure session setup
 
-        # Focus and type into the ProseMirror editor
-        editor = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "prompt-textarea"))
-        )
-
-        # Use JavaScript to simulate typing (async IIFE pattern)
+        # Use JavaScript to simulate typing and sending
         script = """
-            const editor = arguments[0];
+        (async () => {
+            const text = arguments[0];
+
+            // Dismiss popup if it appears
+            const logoutLink = Array.from(document.querySelectorAll('a, button')).find(
+                el => el.textContent.trim() === "Stay logged out"
+            );
+            if (logoutLink) {
+                logoutLink.click();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            // Find the editor
+            const editor = document.querySelector('[contenteditable="true"].ProseMirror');
+            if (!editor) {
+                console.error("❌ Editor not found");
+                return;
+            }
+
             editor.focus();
-            const text = arguments[1];
 
-            (async function() {
-                for (let char of text) {
-                    editor.dispatchEvent(new KeyboardEvent('keydown', { key: char }));
-                    editor.dispatchEvent(new InputEvent('beforeinput', {
-                        inputType: 'insertText',
-                        data: char,
-                        bubbles: true,
-                        cancelable: true
-                    }));
-                    document.execCommand('insertText', false, char);
-                    await new Promise(resolve => setTimeout(resolve, 30));
-                }
-            })();
+            // Simulate typing
+            for (const char of text) {
+                editor.dispatchEvent(new InputEvent('beforeinput', {
+                    inputType: 'insertText',
+                    data: char,
+                    bubbles: true,
+                    cancelable: true
+                }));
+                document.execCommand('insertText', false, char);
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+
+            // Click the send button
+            const sendBtn = document.querySelector('#composer-submit-button');
+            if (sendBtn) {
+                sendBtn.click();
+            } else {
+                console.warn("⚠️ Send button not found");
+            }
+        })();
         """
-        driver.execute_script(script, editor, query)
+        driver.execute_script(script, query)
 
-        # Wait briefly before sending
+        # Wait before polling for response
         time.sleep(1)
-
-        # Click the send button
-        try:
-            send_button = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.ID, "composer-submit-button"))
-            )
-            send_button.click()
-            logging.info("✅ Send button clicked")
-        except NoSuchElementException:
-            return jsonify({"error": "Send button not found"}), 400
 
         # Poll for response with dynamic waiting
         response = wait_for_response(max_wait_time=15, interval=2)
@@ -202,6 +211,7 @@ def ask():
             "details": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
     print("Chromedriver version:", get_binary_version(chromedriver_bin))
