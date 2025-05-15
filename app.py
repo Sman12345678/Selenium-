@@ -53,21 +53,27 @@ class PersistentPopupError(Exception):
 
 def dismiss_popup(timeout=15):
     try:
-        WebDriverWait(driver, timeout).until(
-            EC.element_to_be_clickable((
-                By.LINK_TEXT,
-                "Stay logged out"
-            ))
-        ).click()
-        logging.info("🎉 Popup found and dismissed")
-        time.sleep(2)  # Let DOM update after dismiss
-        return True
-    except TimeoutException:
-        logging.warning(f"⚠️ Popup not found within timeout ({timeout}s)")
+        for _ in range(timeout):
+            result = driver.execute_script("""
+                const logoutLink = Array.from(document.querySelectorAll('a, button')).find(el =>
+                  el.textContent.trim() === "Stay logged out"
+                );
+                if (logoutLink) { logoutLink.click(); return true; }
+                return false;
+            """)
+            if result:
+                logging.info("🎉 Popup found and dismissed via JS")
+                time.sleep(2)  # Let DOM update
+                return True
+            time.sleep(1)
+
+        logging.warning(f"⚠️ 'Stay logged out' not found within timeout ({timeout}s)")
         return False
+
     except Exception as e:
         logging.error(f"❌ Unexpected error in dismiss_popup: {e}")
         return False
+
 
 def popup_watcher(max_retries=30):
     """Continuously tries to dismiss a popup for a maximum number of retries."""
