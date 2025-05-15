@@ -108,7 +108,24 @@ def setup_chatgpt_session():
 
     setup_complete = True
     logging.info("✅ Initial setup completed")
-
+def wait_for_response(max_wait_time=10, interval=1):
+    """ Polls for the response div to appear within max_wait_time seconds """
+    for _ in range(max_wait_time):
+        try:
+            # Check if the response element is present
+            page = driver.page_source
+            soup = BeautifulSoup(page, 'html.parser')
+            div = soup.find("div", class_="markdown prose dark:prose-invert w-full break-words dark")
+            if div:
+                return div.get_text(separator="\n").strip()  # Return the text if found
+        except Exception as e:
+            logging.error("❌ Error during polling: " + str(e))
+        
+        # Wait for the next polling interval
+        time.sleep(interval)
+    
+    # If we reach this point, the response wasn't found in the maximum wait time
+    return None
 @app.route('/ask')
 def ask():
     global setup_complete
@@ -118,50 +135,55 @@ def ask():
         if not query:
             return jsonify({"error": "No query provided"}), 400
 
-        setup_chatgpt_session()  # Ensure setup is run only once
+        setup_chatgpt_session()  # Ensure session setup
 
-        # Focus and type into the editor
-        wait = WebDriverWait(driver, 10)
-        editor = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="prompt-textarea"]')))
-        editor.click()
+        # Focus and type into the ProseMirror editor
+        editor = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "prompt-textarea"))
+        )
 
-        # Inject the query into the editable area
-        driver.execute_script("""
+        # Use JavaScript to simulate typing (async IIFE pattern)
+        script = """
             const editor = arguments[0];
-            const paragraph = editor.querySelector("p");
-            if (paragraph) {
-                paragraph.innerText = arguments[1];
-            } else {
-                const p = document.createElement("p");
-                p.innerText = arguments[1];
-                editor.appendChild(p);
-            }
-        """, editor, query)
+            editor.focus();
+            const text = arguments[1];
+
+            (async function() {
+                for (let char of text) {
+                    editor.dispatchEvent(new KeyboardEvent('keydown', { key: char }));
+                    editor.dispatchEvent(new InputEvent('beforeinput', {
+                        inputType: 'insertText',
+                        data: char,
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                    document.execCommand('insertText', false, char);
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                }
+            })();
+        """
+        driver.execute_script(script, editor, query)
+
+        # Wait briefly before sending
+        time.sleep(1)
 
         # Click the send button
         try:
-            send_button = driver.find_element(By.ID, "composer-submit-button")
+            send_button = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.ID, "composer-submit-button"))
+            )
             send_button.click()
             logging.info("✅ Send button clicked")
         except NoSuchElementException:
             return jsonify({"error": "Send button not found"}), 400
 
-        # Wait and parse response
-        time.sleep(6)
-        dismiss_popup()
+        # Poll for response with dynamic waiting
+        response = wait_for_response(max_wait_time=15, interval=2)
 
-        page = driver.page_source
-        soup = BeautifulSoup(page, 'html.parser')
-
-        div = soup.find("div", class_="markdown prose dark:prose-invert w-full break-words dark")
-        if div:
-            all_text = div.get_text(separator="\n").strip()
-            if all_text:
-                return jsonify({"bot": all_text})
-            else:
-                return jsonify({"error": "Response div found, but it's empty"}), 404
+        if response:
+            return jsonify({"bot": response})
         else:
-            return jsonify({"error": "Response container not found"}), 404
+            return jsonify({"error": "Response not found within the expected time."}), 404
 
     except Exception as e:
         logging.error("❌ Error in /ask endpoint", exc_info=True)
