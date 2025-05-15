@@ -52,6 +52,7 @@ class PersistentPopupError(Exception):
     pass
 
 def dismiss_popup(timeout=15):
+    """Attempt to dismiss 'Stay logged out' popup if it appears."""
     try:
         for _ in range(timeout):
             result = driver.execute_script("""
@@ -67,34 +68,14 @@ def dismiss_popup(timeout=15):
                 return True
             time.sleep(1)
 
-        logging.warning(f"⚠️ 'Stay logged out' not found within timeout ({timeout}s)")
+        # Silently continue if popup never appeared
         return False
 
     except Exception as e:
         logging.error(f"❌ Unexpected error in dismiss_popup: {e}")
         return False
 
-
-def popup_watcher(max_retries=30):
-    """Continuously tries to dismiss a popup for a maximum number of retries."""
-    logging.info("🔍 Starting popup watcher...")
-    retries = 0
-    while retries < max_retries:
-        success = dismiss_popup(timeout=15)
-        if success:
-            logging.info("✅ Popup dismissed by popup_watcher")
-            return True
-        retries += 1
-        time.sleep(1)
-    
-    # If we exhaust all retries, raise the PersistentPopupError
-    logging.error(f"🚨 Popup could not be dismissed after {max_retries} retries")
-    raise PersistentPopupError("Popup could not be dismissed after multiple attempts.")
-
 setup_complete = False
-
-# Start the background watcher
-threading.Thread(target=popup_watcher, daemon=True).start()
 
 def setup_chatgpt_session():
     global setup_complete
@@ -105,19 +86,14 @@ def setup_chatgpt_session():
     driver.get("https://chatgpt.com")
     time.sleep(15)  # Wait for full page load
 
-    popup_dismissed = False
-    for attempt in range(3):
+    for _ in range(3):
         if dismiss_popup(timeout=10):
-            popup_dismissed = True
             break
         time.sleep(5)
 
-    if not popup_dismissed:
-        logging.warning("⚠️ Popup was not found/dismissed during setup. Background watcher is running.")
-
-
     setup_complete = True
     logging.info("✅ Initial setup completed")
+
 def wait_for_response(max_wait_time=10, interval=1):
     """ Polls for the response div to appear within max_wait_time seconds """
     for _ in range(max_wait_time):
