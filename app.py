@@ -55,8 +55,8 @@ def dismiss_popup(timeout=15):
     try:
         WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable((
-                By.CSS_SELECTOR,
-                "a.text-token-text-secondary.mt-5.cursor-pointer.text-sm.font-semibold.underline"
+                By.XPATH,
+                "//*[@id="radix-«r7»"]"
             ))
         ).click()
         logging.info("🎉 Popup found and dismissed")
