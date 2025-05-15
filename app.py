@@ -86,11 +86,14 @@ def popup_watcher(max_retries=30):
             return True
         retries += 1
         time.sleep(1)
+    
+    # If we exhaust all retries, raise the PersistentPopupError
     logging.error(f"🚨 Popup could not be dismissed after {max_retries} retries")
-    return False
+    raise PersistentPopupError("Popup could not be dismissed after multiple attempts.")
 
 setup_complete = False
 
+# Start the background watcher
 threading.Thread(target=popup_watcher, daemon=True).start()
 
 def setup_chatgpt_session():
@@ -111,6 +114,7 @@ def setup_chatgpt_session():
 
     if not popup_dismissed:
         logging.warning("⚠️ Popup was not found/dismissed during setup. Background watcher is running.")
+
 
     setup_complete = True
     logging.info("✅ Initial setup completed")
