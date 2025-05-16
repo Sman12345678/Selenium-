@@ -178,8 +178,8 @@ def ask():
 
         time.sleep(1)
         logging.info("📨 Query sent, waiting for response...")
-        response = wait_for_response(max_wait_time=15, interval=2)
         driver.save_screenshot("image.png")
+        response = wait_for_response(max_wait_time=15, interval=2)
 
         if response:
             return jsonify({"bot": response})
