@@ -22,6 +22,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
+ADMIN_CODE="ICU14CU"  #FOR SERVER RESTART
 
 app = Flask(__name__)
 
@@ -202,6 +203,27 @@ def ask():
             "details": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+@app.route('/restart')
+def restart_browser():
+    global driver
+
+    # Get admin code from query param ?code=...
+    code = request.args.get("code")
+
+    if code != ADMIN_CODE:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    try:
+        if driver:
+            driver.quit()
+
+        driver = webdriver.Chrome(service=service, options=options)
+        setup_chatgpt_session()
+
+        return jsonify({"status": "success", "message": "Browser session restarted."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
