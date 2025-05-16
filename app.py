@@ -89,7 +89,7 @@ def setup_chatgpt_session():
     setup_complete = True
     logging.info("✅ Initial setup completed")
 
-def wait_for_response_bs(max_wait_time=15, interval=2):
+def wait_for_response(max_wait_time=15, interval=2):
     """Polls the page using BeautifulSoup to extract the latest response"""
     for _ in range(max_wait_time):
         html = driver.page_source
