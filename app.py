@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -134,6 +134,7 @@ def ask():
 
         dismiss_popup()
         logging.info("💬 Typing and sending query...")
+        driver.save_screenshot("image.png")
 
         script = """
         (async () => {
@@ -174,6 +175,7 @@ def ask():
         time.sleep(1)
         logging.info("📨 Query sent, waiting for response...")
         response = wait_for_response(max_wait_time=15, interval=2)
+        driver.save_screenshot("image.png")
 
         if response:
             return jsonify({"bot": response})
@@ -202,6 +204,15 @@ def restart_browser():
         return jsonify({"status": "success", "message": "Browser session restarted."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/screenshot')
+def screenshot():
+    path = "image.png"  # or just "screenshot.png" if you want a generic one
+    try:
+        return send_file(path, mimetype='image/png')
+    except Exception as e:
+        return jsonify({"error": f"Could not retrieve screenshot: {e}"}), 500
+
 
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
