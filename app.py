@@ -22,6 +22,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
+setup_complete = False
+
 ADMIN_CODE="ICU14CU"  #FOR SERVER RESTART
 
 app = Flask(__name__)
