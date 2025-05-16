@@ -26,6 +26,8 @@ setup_complete = False
 
 ADMIN_CODE="ICU14CU"  #FOR SERVER RESTART
 
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"
+
 app = Flask(__name__)
 
 def get_binary_version(binary_path):
@@ -42,6 +44,7 @@ options = Options()
 options.binary_location = chrome_bin
 options.add_argument("--headless=new")
 options.add_argument("--no-sandbox")
+options.add_argument(f"user-agent={user_agent}")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--remote-debugging-port=9222")
 options.add_argument("--disable-gpu")
