@@ -95,23 +95,21 @@ def setup_chatgpt_session():
     logging.info("✅ Initial setup completed")
 
 def wait_for_response(max_wait_time=10, interval=1):
-    """ Polls for the response div to appear within max_wait_time seconds """
+    """Polls for the last matching response div to appear within max_wait_time seconds"""
     for _ in range(max_wait_time):
-        try:
-            # Check if the response element is present
-            page = driver.page_source
-            soup = BeautifulSoup(page, 'html.parser')
-            div = soup.find("div", class_="markdown prose dark:prose-invert w-full break-words dark")
-            if div:
-                return div.get_text(separator="\n").strip()  # Return the text if found
-        except Exception as e:
-            logging.error("❌ Error during polling: " + str(e))
-        
-        # Wait for the next polling interval
+        page = driver.page_source
+        soup = BeautifulSoup(page, 'html.parser')
+        divs = soup.find_all("div", class_="markdown prose dark:prose-invert w-full break-words light")
+
+        if divs:
+            last_div = divs[-1]
+            return last_div.get_text(separator="\n").strip()
+
         time.sleep(interval)
-    
-    # If we reach this point, the response wasn't found in the maximum wait time
+
+    # If no response is found in the given time
     return None
+
 @app.route('/ask')
 def ask():
     global setup_complete
@@ -122,6 +120,9 @@ def ask():
             return jsonify({"error": "No query provided"}), 400
 
         setup_chatgpt_session()  # Ensure session setup
+        
+        #dismiss popup before pasting query....
+        dismiss_popup()
 
         # Use JavaScript to simulate typing and sending
         script = """
