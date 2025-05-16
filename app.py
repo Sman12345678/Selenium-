@@ -95,19 +95,32 @@ def setup_chatgpt_session():
     logging.info("✅ Initial setup completed")
 
 def wait_for_response(max_wait_time=10, interval=1):
-    """Polls for the last matching response div to appear within max_wait_time seconds"""
+    """Polls for the last bot response using partial class match in JavaScript"""
+    js_script = """
+        const allDivs = document.querySelectorAll('div');
+        const matching = [...allDivs].filter(div => {
+            const classes = div.className.split(/\\s+/);
+            return classes.includes('markdown') &&
+                   classes.includes('prose') &&
+                   classes.includes('dark:prose-invert') &&
+                   classes.includes('w-full') &&
+                   classes.includes('break-words') &&
+                   classes.includes('light');
+        });
+
+        if (matching.length > 0) {
+            return matching[matching.length - 1].textContent.trim();
+        } else {
+            return null;
+        }
+    """
+
     for _ in range(max_wait_time):
-        page = driver.page_source
-        soup = BeautifulSoup(page, 'html.parser')
-        divs = soup.find_all("div", class_="markdown prose dark:prose-invert w-full break-words light")
-
-        if divs:
-            last_div = divs[-1]
-            return last_div.get_text(separator="\n").strip()
-
+        response = driver.execute_script(js_script)
+        if response:
+            return response
         time.sleep(interval)
 
-    # If no response is found in the given time
     return None
 
 @app.route('/ask')
