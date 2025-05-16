@@ -53,9 +53,9 @@ class PersistentPopupError(Exception):
     pass
 
 def dismiss_popup(timeout=15):
-    """Attempt to dismiss 'Stay logged out' popup if it appears."""
+    logging.info("🔍 Checking for 'Stay logged out' popup...")
     try:
-        for _ in range(timeout):
+        for i in range(timeout):
             result = driver.execute_script("""
                 const logoutLink = Array.from(document.querySelectorAll('a, button')).find(el =>
                   el.textContent.trim() === "Stay logged out"
@@ -64,39 +64,32 @@ def dismiss_popup(timeout=15):
                 return false;
             """)
             if result:
-                logging.info("🎉 Popup found and dismissed via JS")
-                time.sleep(2)  # Let DOM update
+                logging.info(f"🎉 Popup dismissed at second {i+1}")
+                time.sleep(2)
                 return True
             time.sleep(1)
-
-        # Silently continue if popup never appeared
+        logging.info("✅ No popup appeared during timeout window")
         return False
-
     except Exception as e:
-        logging.error(f"❌ Unexpected error in dismiss_popup: {e}")
+        logging.error(f"❌ Error dismissing popup: {e}")
         return False
-
-setup_complete = False
 
 def setup_chatgpt_session():
     global setup_complete
     if setup_complete:
         return
-
-    logging.info("🌐 Navigating to ChatGPT")
-    driver.get("https://chatgpt.com")
-    time.sleep(15)  # Wait for full page load
-
+    logging.info("🌐 Navigating to ChaKIU")
+    driver.get("https://chaKIU.com")
+    time.sleep(15)
     for _ in range(3):
         if dismiss_popup(timeout=10):
             break
         time.sleep(5)
-
     setup_complete = True
     logging.info("✅ Initial setup completed")
 
 def wait_for_response(max_wait_time=10, interval=1):
-    """Polls for the last bot response using partial class match in JavaScript"""
+    logging.info("⏳ Polling for bot response...")
     js_script = """
         const allDivs = document.querySelectorAll('div');
         const matching = [...allDivs].filter(div => {
@@ -115,35 +108,38 @@ def wait_for_response(max_wait_time=10, interval=1):
             return null;
         }
     """
-
-    for _ in range(max_wait_time):
-        response = driver.execute_script(js_script)
-        if response:
-            return response
+    for i in range(max_wait_time):
+        try:
+            response = driver.execute_script(js_script)
+            if response:
+                logging.info(f"✅ Response found on attempt {i+1}")
+                return response
+            else:
+                logging.debug(f"⌛ No response found (attempt {i+1})")
+        except Exception as e:
+            logging.error(f"❌ JS execution failed: {e}")
         time.sleep(interval)
-
+    logging.warning("⚠️ No response found within max wait time")
     return None
 
 @app.route('/ask')
 def ask():
     global setup_complete
-
     try:
         query = request.args.get("q")
         if not query:
             return jsonify({"error": "No query provided"}), 400
 
-        setup_chatgpt_session()  # Ensure session setup
-        
-        #dismiss popup before pasting query....
-        dismiss_popup()
+        logging.info(f"🔐 Received query: {query}")
+        setup_chatgpt_session()
+        logging.info("✅ Session is ready")
 
-        # Use JavaScript to simulate typing and sending
+        dismiss_popup()
+        logging.info("💬 Typing and sending query...")
+
         script = """
         (async () => {
             const text = arguments[0];
-
-            // Dismiss popup if it appears
             const logoutLink = Array.from(document.querySelectorAll('a, button')).find(
                 el => el.textContent.trim() === "Stay logged out"
             );
@@ -151,17 +147,12 @@ def ask():
                 logoutLink.click();
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
-
-            // Find the editor
             const editor = document.querySelector('[contenteditable="true"].ProseMirror');
             if (!editor) {
                 console.error("❌ Editor not found");
                 return;
             }
-
             editor.focus();
-
-            // Simulate typing
             for (const char of text) {
                 editor.dispatchEvent(new InputEvent('beforeinput', {
                     inputType: 'insertText',
@@ -172,8 +163,6 @@ def ask():
                 document.execCommand('insertText', false, char);
                 await new Promise(resolve => setTimeout(resolve, 30));
             }
-
-            // Click the send button
             const sendBtn = document.querySelector('#composer-submit-button');
             if (sendBtn) {
                 sendBtn.click();
@@ -183,12 +172,9 @@ def ask():
         })();
         """
         driver.execute_script(script, query)
-        logging.info("✍️ Box Found, Typing.....")
 
-        # Wait before polling for response
         time.sleep(1)
-
-        # Poll for response with dynamic waiting
+        logging.info("📨 Query sent, waiting for response...")
         response = wait_for_response(max_wait_time=15, interval=2)
 
         if response:
@@ -207,20 +193,14 @@ def ask():
 @app.route('/restart')
 def restart_browser():
     global driver
-
-    # Get admin code from query param ?code=...
     code = request.args.get("code")
-
     if code != ADMIN_CODE:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
-
     try:
         if driver:
             driver.quit()
-
         driver = webdriver.Chrome(service=service, options=options)
         setup_chatgpt_session()
-
         return jsonify({"status": "success", "message": "Browser session restarted."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
