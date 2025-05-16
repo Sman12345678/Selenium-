@@ -48,10 +48,6 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-class PersistentPopupError(Exception):
-    """Raised when popup cannot be dismissed after several attempts."""
-    pass
-
 def dismiss_popup(timeout=15):
     logging.info("🔍 Checking for 'Stay logged out' popup...")
     try:
