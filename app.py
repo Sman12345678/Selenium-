@@ -89,12 +89,14 @@ def setup_chatgpt_session():
     setup_complete = True
     logging.info("✅ Initial setup completed")
 
-def wait_for_response(max_wait_time=30, interval=2):
-    """Polls for the last bot response by extracting <p> inside the correct div."""
+def wait_for_response(max_wait_time=15, interval=2):
+    """Polls for the last bot response from the properly escaped div with <p> tags"""
     js_script = """
         const allDivs = document.querySelectorAll('div.markdown.prose.dark\\:prose-invert.w-full.break-words.light');
         const lastDiv = allDivs[allDivs.length - 1];
-        if (!lastDiv) return null;
+        if (!lastDiv) {
+            return null;
+        }
 
         const paragraphs = lastDiv.querySelectorAll('p');
         let combinedText = '';
@@ -103,19 +105,20 @@ def wait_for_response(max_wait_time=30, interval=2):
         return combinedText.trim();
     """
 
-    for i in range(max_wait_time):
+    for _ in range(max_wait_time):
         try:
             response = driver.execute_script(js_script)
-            preview = (response[:100] + "...") if response and len(response) > 100 else response
-            logging.info(f"⌛ Polling attempt {i+1}/{max_wait_time} — Response: {preview or 'None'}")
             if response:
+                logging.info("✅ Bot response found.")
                 return response
         except Exception as e:
-            logging.warning(f"⚠️ JavaScript execution error during polling: {e}")
+            logging.error("❌ JavaScript execution error during polling: " + str(e))
+
         time.sleep(interval)
 
-    logging.warning("❌ No response found after polling.")
+    logging.warning("⌛ Response not found within wait time.")
     return None
+
 
 @app.route('/ask')
 def ask():
