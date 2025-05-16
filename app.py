@@ -76,8 +76,8 @@ def setup_chatgpt_session():
     global setup_complete
     if setup_complete:
         return
-    logging.info("🌐 Navigating to ChaKIU")
-    driver.get("https://chaKIU.com")
+    logging.info("🌐 Navigating to ChatGPT")
+    driver.get("https://chatgpt.com")
     time.sleep(15)
     for _ in range(3):
         if dismiss_popup(timeout=10):
