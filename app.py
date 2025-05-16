@@ -89,39 +89,32 @@ def setup_chatgpt_session():
     setup_complete = True
     logging.info("✅ Initial setup completed")
 
-def wait_for_response(max_wait_time=30, interval=3):
-    logging.info("⏳ Polling for bot response...")
-    driver.save_screenshot("image.png")
+def wait_for_response(max_wait_time=30, interval=2):
+    """Polls for the last bot response by extracting <p> inside the correct div."""
     js_script = """
-        const allDivs = document.querySelectorAll('div');
-        const matching = [...allDivs].filter(div => {
-            const classes = div.className.split(/\\s+/);
-            return classes.includes('markdown') &&
-                   classes.includes('prose') &&
-                   classes.includes('dark:prose-invert') &&
-                   classes.includes('w-full') &&
-                   classes.includes('break-words') &&
-                   classes.includes('light');
-        });
+        const allDivs = document.querySelectorAll('div.markdown.prose.dark\\:prose-invert.w-full.break-words.light');
+        const lastDiv = allDivs[allDivs.length - 1];
+        if (!lastDiv) return null;
 
-        if (matching.length > 0) {
-            return matching[matching.length - 1].textContent.trim();
-        } else {
-            return null;
-        }
+        const paragraphs = lastDiv.querySelectorAll('p');
+        let combinedText = '';
+        paragraphs.forEach(p => combinedText += p.innerText + "\\n");
+
+        return combinedText.trim();
     """
+
     for i in range(max_wait_time):
         try:
             response = driver.execute_script(js_script)
+            preview = (response[:100] + "...") if response and len(response) > 100 else response
+            logging.info(f"⌛ Polling attempt {i+1}/{max_wait_time} — Response: {preview or 'None'}")
             if response:
-                logging.info(f"✅ Response found on attempt {i+1}")
                 return response
-            else:
-                logging.debug(f"⌛ No response found (attempt {i+1})")
         except Exception as e:
-            logging.error(f"❌ JS execution failed: {e}")
+            logging.warning(f"⚠️ JavaScript execution error during polling: {e}")
         time.sleep(interval)
-    logging.warning("⚠️ No response found within max wait time")
+
+    logging.warning("❌ No response found after polling.")
     return None
 
 @app.route('/ask')
