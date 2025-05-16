@@ -89,8 +89,9 @@ def setup_chatgpt_session():
     setup_complete = True
     logging.info("✅ Initial setup completed")
 
-def wait_for_response(max_wait_time=10, interval=1):
+def wait_for_response(max_wait_time=30, interval=3):
     logging.info("⏳ Polling for bot response...")
+    driver.save_screenshot("image.png")
     js_script = """
         const allDivs = document.querySelectorAll('div');
         const matching = [...allDivs].filter(div => {
