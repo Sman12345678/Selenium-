@@ -89,35 +89,25 @@ def setup_chatgpt_session():
     setup_complete = True
     logging.info("✅ Initial setup completed")
 
-def wait_for_response(max_wait_time=15, interval=2):
-    """Polls for the last bot response from the properly escaped div with <p> tags"""
-    js_script = """
-        const allDivs = document.querySelectorAll('div.markdown.prose.dark\\:prose-invert.w-full.break-words.light');
-        const lastDiv = allDivs[allDivs.length - 1];
-        if (!lastDiv) {
-            return null;
-        }
-
-        const paragraphs = lastDiv.querySelectorAll('p');
-        let combinedText = '';
-        paragraphs.forEach(p => combinedText += p.innerText + "\\n");
-
-        return combinedText.trim();
-    """
-
+def wait_for_response_bs(max_wait_time=15, interval=2):
+    """Polls the page using BeautifulSoup to extract the latest response"""
     for _ in range(max_wait_time):
-        try:
-            response = driver.execute_script(js_script)
-            if response:
-                logging.info("✅ Bot response found.")
-                return response
-        except Exception as e:
-            logging.error("❌ JavaScript execution error during polling: " + str(e))
+        html = driver.page_source
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # Look for the last div with the specific class
+        response_divs = soup.find_all('div', class_="markdown prose dark:prose-invert w-full break-words light")
+
+        if response_divs:
+            last_div = response_divs[-1]
+            response_text = '\n'.join(p.get_text(strip=True) for p in last_div.find_all('p'))
+            if response_text:
+                return response_text
 
         time.sleep(interval)
 
-    logging.warning("⌛ Response not found within wait time.")
     return None
+
 
 
 @app.route('/ask')
