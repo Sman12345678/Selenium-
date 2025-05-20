@@ -72,7 +72,7 @@ def setup_chatgpt_session():
     if setup_complete:
         return
     logging.info("🌐 Navigating to Chalo")
-    driver.get("https://chalo.com")
+    driver.get("https://chatgpt.com")
     time.sleep(15)
     for _ in range(3):
         if dismiss_popup(timeout=10):
