@@ -1,41 +1,25 @@
 from flask import Flask, jsonify, request, send_file
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import TimeoutException
 import subprocess
 import os
 import traceback
 import time
-from bs4 import BeautifulSoup
 import logging
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import threading
 
-# Set up basic logging configuration
+# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
-setup_complete = False
-
-ADMIN_CODE="ICU14CU"  #FOR SERVER RESTART
+ADMIN_CODE = "ICU14CU"
 
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"
 
 app = Flask(__name__)
-
-def get_binary_version(binary_path):
-    try:
-        result = subprocess.run([binary_path, "--version"], capture_output=True, text=True, check=True)
-        return result.stdout.strip()
-    except Exception as e:
-        return f"Could not determine version: {e}"
 
 chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
 chromedriver_bin = os.environ.get("CHROMEDRIVER_BIN", "/usr/bin/chromedriver")
@@ -46,12 +30,18 @@ options.add_argument("--headless=new")
 options.add_argument("--no-sandbox")
 options.add_argument(f"user-agent={user_agent}")
 options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--remote-debugging-port=9222")
 options.add_argument("--disable-gpu")
 options.add_argument("--disable-software-rasterizer")
 
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
+
+def get_binary_version(binary_path):
+    try:
+        result = subprocess.run([binary_path, "--version"], capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except Exception as e:
+        return f"Could not determine version: {e}"
 
 def dismiss_popup(timeout=15):
     logging.info("🔍 Checking for 'Stay logged out' popup...")
@@ -75,12 +65,14 @@ def dismiss_popup(timeout=15):
         logging.error(f"❌ Error dismissing popup: {e}")
         return False
 
+setup_complete = False
+
 def setup_chatgpt_session():
     global setup_complete
     if setup_complete:
         return
-    logging.info("🌐 Navigating to ChatGPT")
-    driver.get("https://chatgpt.com")
+    logging.info("🌐 Navigating to Chalo")
+    driver.get("https://chalo.com")
     time.sleep(15)
     for _ in range(3):
         if dismiss_popup(timeout=10):
@@ -89,26 +81,37 @@ def setup_chatgpt_session():
     setup_complete = True
     logging.info("✅ Initial setup completed")
 
-def wait_for_response(max_wait_time=15, interval=2):
-    """Polls the page using BeautifulSoup to extract the latest response"""
-    for _ in range(max_wait_time):
-        html = driver.page_source
-        soup = BeautifulSoup(html, 'html.parser')
+def wait_for_response_js():
+    """
+    Uses JavaScript executed via Selenium to poll the page every 500ms up to 20 seconds
+    for the last <p> inside the response div, returning its innerText when found.
+    """
+    js_script = """
+    const maxWaitTime = 20000; // 20 seconds
+    const intervalTime = 500;  // 500 ms
+    const startTime = Date.now();
 
-        # Look for the last div with the specific class
-        response_divs = soup.find_all('div', class_="markdown prose dark:prose-invert w-full break-words light")
+    function check() {
+      const targetDiv = document.querySelector('div.markdown.prose.dark\\:prose-invert.w-full.break-words.dark');
+      if (targetDiv) {
+        const paragraphs = targetDiv.querySelectorAll('p');
+        if (paragraphs.length > 0) {
+          return paragraphs[paragraphs.length - 1].innerText.trim();
+        }
+      }
+      if (Date.now() - startTime > maxWaitTime) {
+        return null;
+      }
+      return new Promise(resolve => setTimeout(() => resolve(check()), intervalTime));
+    }
 
-        if response_divs:
-            last_div = response_divs[-1]
-            response_text = '\n'.join(p.get_text(strip=True) for p in last_div.find_all('p'))
-            if response_text:
-                return response_text
-
-        time.sleep(interval)
-
-    return None
-
-
+    return check();
+    """
+    # Execute async JavaScript in Selenium, returning the awaited result
+    return driver.execute_async_script("""
+    var callback = arguments[arguments.length - 1];
+    (""" + js_script + """).then(callback);
+    """)
 
 @app.route('/ask')
 def ask():
@@ -162,14 +165,18 @@ def ask():
         """
         driver.execute_script(script, query)
 
-        time.sleep(1)
+        time.sleep(1)  # Small wait to allow send action to trigger
+
         logging.info("📨 Query sent, waiting for response...")
         driver.save_screenshot("image.png")
-        response = wait_for_response(max_wait_time=15, interval=2)
+
+        response = wait_for_response_js()
 
         if response:
+            logging.info("✅ Response received")
             return jsonify({"bot": response})
         else:
+            logging.warning("⚠️ No response found within timeout")
             return jsonify({"error": "Response not found within the expected time."}), 404
 
     except Exception as e:
@@ -197,12 +204,11 @@ def restart_browser():
 
 @app.route('/screenshot')
 def screenshot():
-    path = "image.png"  # or just "screenshot.png" if you want a generic one
+    path = "image.png"
     try:
         return send_file(path, mimetype='image/png')
     except Exception as e:
         return jsonify({"error": f"Could not retrieve screenshot: {e}"}), 500
-
 
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
