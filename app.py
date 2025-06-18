@@ -245,6 +245,7 @@ def serve_screenshot_api():
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
     print("Chromedriver version:", get_binary_version(chromedriver_bin))
+    setup_chatgpt_session()
     print("""
       _____ _    _ _      ______ _____ _____ __  __          _   _ 
  / ____| |  | | |    |  ____|_   _|_   _|  \/  |   /\   | \ | |
@@ -255,3 +256,4 @@ if __name__ == '__main__':
                                                               
 """)
     app.run(host='0.0.0.0', port=10000,debug=True)
+   
