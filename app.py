@@ -8,6 +8,8 @@ import os
 import traceback
 import time
 import logging
+from io import ByteIO
+import base64
 
 # Set up logging
 logging.basicConfig(
@@ -35,6 +37,28 @@ options.add_argument("--disable-software-rasterizer")
 
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
+
+
+
+def take_screenshot_in_memory(driver):
+    try:
+        logging.info("📸 Capturing full-page screenshot using CDP...")
+        metrics = driver.execute_cdp_cmd("Page.getLayoutMetrics", {})
+        width = metrics["contentSize"]["width"]
+        height = metrics["contentSize"]["height"]
+        
+        # Set the viewport to full height
+        driver.set_window_size(width, height)
+        
+        screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
+            "fromSurface": True,
+            "captureBeyondViewport": True
+        })
+        screenshot_png = base64.b64decode(screenshot_data["data"])
+        return screenshot_png
+    except Exception as e:
+        logging.error(f"❌ Failed to capture full-page screenshot: {e}")
+        raise
 
 def get_binary_version(binary_path):
     try:
@@ -71,8 +95,9 @@ def setup_chatgpt_session():
     global setup_complete
     if setup_complete:
         return
-    logging.info("🌐 Navigating to Chalo")
+    logging.info("🌐 Navigating to Chatgpt")
     driver.get("https://chatgpt.com")
+    take_screenshot_in_memory(driver)
     time.sleep(15)
     for _ in range(3):
         if dismiss_popup(timeout=10):
@@ -127,7 +152,7 @@ def ask():
 
         dismiss_popup()
         logging.info("💬 Typing and sending query...")
-        driver.save_screenshot("image.png")
+        take_screenshot_in_memory(driver)
 
         script = """
         (async () => {
@@ -168,8 +193,7 @@ def ask():
         time.sleep(1)  # Small wait to allow send action to trigger
 
         logging.info("📨 Query sent, waiting for response...")
-        driver.save_screenshot("image.png")
-
+        take_screenshot_in_memory(driver)
         response = wait_for_response_js()
 
         if response:
@@ -202,15 +226,32 @@ def restart_browser():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/screenshot')
-def screenshot():
-    path = "image.png"
+@app.route("/api/screenshot")
+def serve_screenshot_api():
     try:
-        return send_file(path, mimetype='image/png')
+        screenshot_png = take_screenshot_in_memory(driver)
+        logging.info("✅ Screenshot served as PNG.")
+        return send_file(
+            BytesIO(screenshot_png),
+            mimetype="image/png",
+            as_attachment=False,
+            download_name="screenshot.png"
+        )
     except Exception as e:
-        return jsonify({"error": f"Could not retrieve screenshot: {e}"}), 500
+        logging.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     print("Chromium version:", get_binary_version(chrome_bin))
     print("Chromedriver version:", get_binary_version(chromedriver_bin))
-    app.run(host='0.0.0.0', port=10000)
+    print("""
+      _____ _    _ _      ______ _____ _____ __  __          _   _ 
+ / ____| |  | | |    |  ____|_   _|_   _|  \/  |   /\   | \ | |
+| (___ | |  | | |    | |__    | |   | | | \  / |  /  \  |  \| |
+ \___ \| |  | | |    |  __|   | |   | | | |\/| | / /\ \ | . ` |
+ ____) | |__| | |____| |____ _| |_ _| |_| |  | |/ ____ \| |\  |
+|_____/ \____/|______|______|_____|_____|_|  |_/_/    \_\_| \_|
+                                                              
+""")
+    app.run(host='0.0.0.0', port=10000,debug=True)
