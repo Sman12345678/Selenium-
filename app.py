@@ -149,7 +149,7 @@ def ask():
             return jsonify({"error": "No query provided"}), 400
 
         logging.info(f"🔐 Received query: {query}")
-        setup_chatgpt_session()
+        
         logging.info("✅ Session is ready")
 
         dismiss_popup()
