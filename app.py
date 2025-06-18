@@ -107,36 +107,38 @@ def setup_chatgpt_session():
     logging.info("✅ Initial setup completed")
 
 def wait_for_response_js():
-    """
-    Uses JavaScript executed via Selenium to poll the page every 500ms up to 20 seconds
-    for the last <p> inside the response div, returning its innerText when found.
-    """
     js_script = """
-    const maxWaitTime = 20000; // 20 seconds
-    const intervalTime = 500;  // 500 ms
-    const startTime = Date.now();
+        var callback = arguments[arguments.length - 1];
 
-    function check() {
-      const targetDiv = document.querySelector('div.markdown.prose.dark\\:prose-invert.w-full.break-words.dark');
-      if (targetDiv) {
-        const paragraphs = targetDiv.querySelectorAll('p');
-        if (paragraphs.length > 0) {
-          return paragraphs[paragraphs.length - 1].innerText.trim();
-        }
-      }
-      if (Date.now() - startTime > maxWaitTime) {
-        return null;
-      }
-      return new Promise(resolve => setTimeout(() => resolve(check()), intervalTime));
-    }
+        (function check() {
+            const maxWaitTime = 20000;
+            const intervalTime = 500;
+            const startTime = Date.now();
 
-    return check();
+            function poll(resolve) {
+                const targetDiv = document.querySelector('div.markdown.prose.dark\\:prose-invert.w-full.break-words.dark');
+                if (targetDiv) {
+                    const paragraphs = targetDiv.querySelectorAll('p');
+                    if (paragraphs.length > 0) {
+                        resolve(paragraphs[paragraphs.length - 1].innerText.trim());
+                        return;
+                    }
+                }
+
+                if (Date.now() - startTime > maxWaitTime) {
+                    resolve(null);
+                    return;
+                }
+
+                setTimeout(() => poll(resolve), intervalTime);
+            }
+
+            new Promise(poll).then(callback);
+        })();
     """
-    # Execute async JavaScript in Selenium, returning the awaited result
-    return driver.execute_async_script("""
-    var callback = arguments[arguments.length - 1];
-    (""" + js_script + """).then(callback);
-    """)
+    return driver.execute_async_script(js_script)
+
+   
 
 @app.route('/ask')
 def ask():
