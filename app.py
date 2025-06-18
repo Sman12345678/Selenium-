@@ -8,7 +8,7 @@ import os
 import traceback
 import time
 import logging
-from io import ByteIO
+from io import BytesIO
 import base64
 
 # Set up logging
