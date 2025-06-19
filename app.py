@@ -117,30 +117,32 @@ def setup_chatgpt_session():
 
 def wait_for_response_js():
     js_script = """
-        var callback = arguments[arguments.length - 1];
-        (function check() {
-            const maxWaitTime = 20000;
-            const intervalTime = 500;
-            const startTime = Date.now();
-            function poll(resolve) {
-                const targetDiv = document.querySelector('div.markdown.prose.dark\\:prose-invert.w-full.break-words.dark');
-                if (targetDiv) {
-                    const paragraphs = targetDiv.querySelectorAll('p');
-                    if (paragraphs.length > 0) {
-                        resolve(paragraphs[paragraphs.length - 1].innerText.trim());
-                        return;
-                    }
-                }
-                if (Date.now() - startTime > maxWaitTime) {
-                    resolve(null);
+        const callback = arguments[arguments.length - 1];
+        const startTime = Date.now();
+        const maxWaitTime = 30000;
+        const intervalTime = 500;
+
+        function poll() {
+            const responses = document.querySelectorAll('div.markdown.prose.dark\\:prose-invert.w-full.break-words.dark');
+            if (responses.length > 0) {
+                const last = responses[responses.length - 1];
+                const paragraphs = last.querySelectorAll('p');
+                if (paragraphs.length > 0) {
+                    callback(paragraphs[paragraphs.length - 1].innerText.trim());
                     return;
                 }
-                setTimeout(() => poll(resolve), intervalTime);
             }
-            new Promise(poll).then(callback);
-        })();
+            if (Date.now() - startTime > maxWaitTime) {
+                callback(null);
+            } else {
+                setTimeout(poll, intervalTime);
+            }
+        }
+
+        poll();
     """
     return driver.execute_async_script(js_script)
+
 
 @app.route('/ask')
 def ask():
@@ -158,7 +160,7 @@ def ask():
         logging.info("💬 Typing and sending query...")
         take_screenshot_in_memory(driver)
 
-        script = """
+        typing_script = """
         (async () => {
             const text = arguments[0];
             const logoutLink = Array.from(document.querySelectorAll('a, button')).find(
@@ -168,11 +170,10 @@ def ask():
                 logoutLink.click();
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
+
             const editor = document.querySelector('[contenteditable="true"].ProseMirror');
-            if (!editor) {
-                console.error("❌ Editor not found");
-                return;
-            }
+            if (!editor) return;
+
             editor.focus();
             for (const char of text) {
                 editor.dispatchEvent(new InputEvent('beforeinput', {
@@ -184,19 +185,17 @@ def ask():
                 document.execCommand('insertText', false, char);
                 await new Promise(resolve => setTimeout(resolve, 30));
             }
+
             const sendBtn = document.querySelector('#composer-submit-button');
-            if (sendBtn) {
-                sendBtn.click();
-            } else {
-                console.warn("⚠️ Send button not found");
-            }
+            if (sendBtn) sendBtn.click();
         })();
         """
-        driver.execute_script(script, query)
-        time.sleep(1)
+        driver.execute_script(typing_script, query)
 
+        time.sleep(1)  # Give the UI a moment to react
         logging.info("📨 Query sent, waiting for response...")
         take_screenshot_in_memory(driver)
+
         response = wait_for_response_js()
 
         if response:
