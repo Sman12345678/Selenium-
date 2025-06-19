@@ -156,9 +156,9 @@ def ask():
         logging.info(f"🔐 Received query: {query}")
         logging.info("✅ Session is ready")
 
-        dismiss_popup()
+        
         logging.info("💬 Typing and sending query...")
-        take_screenshot_in_memory(driver)
+        
 
         typing_script = """
         (async () => {
@@ -194,7 +194,7 @@ def ask():
 
         time.sleep(1)  # Give the UI a moment to react
         logging.info("📨 Query sent, waiting for response...")
-        take_screenshot_in_memory(driver)
+      
 
         response = wait_for_response_js()
 
@@ -202,6 +202,7 @@ def ask():
             logging.debug(f"🧠 Bot response: {response}")
             logging.info("✅ Response received")
             return jsonify({"bot": response})
+            take_screenshot_in_memory(driver)
         else:
             logging.warning("⚠️ No response found within timeout")
             return jsonify({"error": "Response not found within the expected time."}), 404
