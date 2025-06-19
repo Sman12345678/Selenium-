@@ -118,28 +118,39 @@ def setup_chatgpt_session():
 def wait_for_response_js():
     js_script = """
         var callback = arguments[arguments.length - 1];
-        const maxWaitTime = 20000;
-        const intervalTime = 500;
-        const startTime = Date.now();
+const maxWaitTime = 20000; // 20 seconds max
+const intervalTime = 500;  // Check every 500ms
+const startTime = Date.now();
 
-        function checkResponse() {
-            const assistantMessages = Array.from(document.querySelectorAll('div[data-message-author-role="assistant"]'));
-            if (assistantMessages.length > 0) {
-                const last = assistantMessages.at(-1);
-                const markdown = last.querySelector('div.markdown');
-                if (markdown && markdown.innerText.trim()) {
-                    callback(markdown.innerText.trim());
-                    return;
-                }
-            }
-            if (Date.now() - startTime > maxWaitTime) {
-                callback(null);
-            } else {
-                setTimeout(checkResponse, intervalTime);
+function checkResponse() {
+    // 1. Find all assistant messages
+    const assistantMessages = document.querySelectorAll('div[data-message-author-role="assistant"]');
+    
+    if (assistantMessages.length > 0) {
+        // 2. Get the last message
+        const lastMessage = assistantMessages[assistantMessages.length - 1];
+        
+        // 3. Try to extract text from <p> or markdown
+        const markdown = lastMessage.querySelector('div.markdown');
+        if (markdown) {
+            const pTag = markdown.querySelector('p');
+            const text = pTag ? pTag.innerText.trim() : markdown.innerText.trim();
+            if (text) {
+                callback(text);
+                return;
             }
         }
+    }
+    
+    // 4. Handle timeout or retry
+    if (Date.now() - startTime > maxWaitTime) {
+        callback(null);
+    } else {
+        setTimeout(checkResponse, intervalTime);
+    }
+}
 
-        checkResponse();
+checkResponse();
     """
     return driver.execute_async_script(js_script)
 
