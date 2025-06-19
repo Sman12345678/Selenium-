@@ -117,29 +117,29 @@ def setup_chatgpt_session():
 
 def wait_for_response_js():
     js_script = """
-        const callback = arguments[arguments.length - 1];
-        const startTime = Date.now();
-        const maxWaitTime = 30000;
+        var callback = arguments[arguments.length - 1];
+        const maxWaitTime = 20000;
         const intervalTime = 500;
+        const startTime = Date.now();
 
-        function poll() {
-            const responses = document.querySelectorAll('div.markdown.prose.dark\\:prose-invert.w-full.break-words.dark');
-            if (responses.length > 0) {
-                const last = responses[responses.length - 1];
-                const paragraphs = last.querySelectorAll('p');
-                if (paragraphs.length > 0) {
-                    callback(paragraphs[paragraphs.length - 1].innerText.trim());
+        function checkResponse() {
+            const messages = Array.from(document.querySelectorAll('div[data-message-author-role="assistant"]'));
+            if (messages.length > 0) {
+                const last = messages.at(-1);
+                const text = last.innerText.trim();
+                if (text) {
+                    callback(text);
                     return;
                 }
             }
             if (Date.now() - startTime > maxWaitTime) {
                 callback(null);
             } else {
-                setTimeout(poll, intervalTime);
+                setTimeout(checkResponse, intervalTime);
             }
         }
 
-        poll();
+        checkResponse();
     """
     return driver.execute_async_script(js_script)
 
