@@ -97,13 +97,14 @@ def setup_chatgpt_session():
         return
     logging.info("🌐 Navigating to Chatgpt")
     driver.get("https://chatgpt.com")
-    take_screenshot_in_memory(driver)
+   
     time.sleep(15)
     for _ in range(3):
         if dismiss_popup(timeout=10):
             break
         time.sleep(5)
     setup_complete = True
+    take_screenshot_in_memory(driver)
     logging.info("✅ Initial setup completed")
 
 def wait_for_response_js():
