@@ -67,7 +67,7 @@ def get_binary_version(binary_path):
         logging.error(f"❌ Could not determine version for {binary_path}", exc_info=True)
         return f"Could not determine version: {e}"
 
-def dismiss_popup(timeout=15):
+def dismiss_popup(timeout=7):
     logging.info("🔍 Looking for 'Stay logged out' popup...")
     try:
         for i in range(timeout):
