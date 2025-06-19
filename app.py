@@ -123,12 +123,12 @@ def wait_for_response_js():
         const startTime = Date.now();
 
         function checkResponse() {
-            const messages = Array.from(document.querySelectorAll('div[data-message-author-role="assistant"]'));
-            if (messages.length > 0) {
-                const last = messages.at(-1);
-                const text = last.innerText.trim();
-                if (text) {
-                    callback(text);
+            const assistantMessages = Array.from(document.querySelectorAll('div[data-message-author-role="assistant"]'));
+            if (assistantMessages.length > 0) {
+                const last = assistantMessages.at(-1);
+                const markdown = last.querySelector('div.markdown');
+                if (markdown && markdown.innerText.trim()) {
+                    callback(markdown.innerText.trim());
                     return;
                 }
             }
@@ -142,6 +142,7 @@ def wait_for_response_js():
         checkResponse();
     """
     return driver.execute_async_script(js_script)
+
 
 
 @app.route('/ask')
