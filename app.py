@@ -13,9 +13,13 @@ import base64
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
 )
+
+file_handler = logging.FileHandler("app.log")
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+logging.getLogger().addHandler(file_handler)
 
 ADMIN_CODE = "ICU14CU"
 
@@ -38,18 +42,13 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-
-
 def take_screenshot_in_memory(driver):
     try:
-        logging.info("📸 Capturing full-page screenshot using CDP...")
+        logging.info("\U0001f4f8 Capturing full-page screenshot using CDP...")
         metrics = driver.execute_cdp_cmd("Page.getLayoutMetrics", {})
         width = metrics["contentSize"]["width"]
         height = metrics["contentSize"]["height"]
-        
-        # Set the viewport to full height
         driver.set_window_size(width, height)
-        
         screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
             "fromSurface": True,
             "captureBeyondViewport": True
@@ -57,7 +56,7 @@ def take_screenshot_in_memory(driver):
         screenshot_png = base64.b64decode(screenshot_data["data"])
         return screenshot_png
     except Exception as e:
-        logging.error(f"❌ Failed to capture full-page screenshot: {e}")
+        logging.error("❌ Failed to capture full-page screenshot", exc_info=True)
         raise
 
 def get_binary_version(binary_path):
@@ -65,28 +64,30 @@ def get_binary_version(binary_path):
         result = subprocess.run([binary_path, "--version"], capture_output=True, text=True, check=True)
         return result.stdout.strip()
     except Exception as e:
+        logging.error(f"❌ Could not determine version for {binary_path}", exc_info=True)
         return f"Could not determine version: {e}"
 
 def dismiss_popup(timeout=15):
-    logging.info("🔍 Checking for 'Stay logged out' popup...")
+    logging.info("🔍 Looking for 'Stay logged out' popup...")
     try:
         for i in range(timeout):
+            logging.debug(f"⌛ Popup check attempt {i+1}")
             result = driver.execute_script("""
                 const logoutLink = Array.from(document.querySelectorAll('a, button')).find(el =>
-                  el.textContent.trim() === "Stay logged out"
+                    el.textContent.trim() === "Stay logged out"
                 );
                 if (logoutLink) { logoutLink.click(); return true; }
                 return false;
             """)
             if result:
-                logging.info(f"🎉 Popup dismissed at second {i+1}")
+                logging.info(f"🎉 'Stay logged out' popup found and clicked (after {i+1}s).")
                 time.sleep(2)
                 return True
             time.sleep(1)
-        logging.info("✅ No popup appeared during timeout window")
+        logging.warning("⏱ No 'Stay logged out' popup detected after timeout.")
         return False
     except Exception as e:
-        logging.error(f"❌ Error dismissing popup: {e}")
+        logging.error("❌ Failed during popup dismissal", exc_info=True)
         return False
 
 setup_complete = False
@@ -94,28 +95,33 @@ setup_complete = False
 def setup_chatgpt_session():
     global setup_complete
     if setup_complete:
+        logging.info("🔁 ChatGPT setup already completed, skipping re-init.")
         return
-    logging.info("🌐 Navigating to Chatgpt")
-    driver.get("https://chatgpt.com")
-   
-    time.sleep(15)
-    for _ in range(3):
-        if dismiss_popup(timeout=10):
-            break
-        time.sleep(5)
-    setup_complete = True
-    take_screenshot_in_memory(driver)
-    logging.info("✅ Initial setup completed")
+    logging.info("🌐 Starting navigation to ChatGPT homepage.")
+    try:
+        driver.get("https://chatgpt.com")
+        logging.debug("⏳ Waiting for the page to fully load...")
+        time.sleep(15)
+        for i in range(3):
+            logging.debug(f"🔄 Attempt #{i+1} to dismiss popup.")
+            if dismiss_popup(timeout=10):
+                logging.info("✅ Popup dismissed successfully.")
+                break
+            time.sleep(5)
+        take_screenshot_in_memory(driver)
+        setup_complete = True
+        logging.info("✅ ChatGPT setup completed.")
+    except Exception as e:
+        logging.error("❌ Error during initial ChatGPT setup", exc_info=True)
+        raise
 
 def wait_for_response_js():
     js_script = """
         var callback = arguments[arguments.length - 1];
-
         (function check() {
             const maxWaitTime = 20000;
             const intervalTime = 500;
             const startTime = Date.now();
-
             function poll(resolve) {
                 const targetDiv = document.querySelector('div.markdown.prose.dark\\:prose-invert.w-full.break-words.dark');
                 if (targetDiv) {
@@ -125,21 +131,16 @@ def wait_for_response_js():
                         return;
                     }
                 }
-
                 if (Date.now() - startTime > maxWaitTime) {
                     resolve(null);
                     return;
                 }
-
                 setTimeout(() => poll(resolve), intervalTime);
             }
-
             new Promise(poll).then(callback);
         })();
     """
     return driver.execute_async_script(js_script)
-
-   
 
 @app.route('/ask')
 def ask():
@@ -147,10 +148,10 @@ def ask():
     try:
         query = request.args.get("q")
         if not query:
+            logging.warning("⚠️ Received request without query parameter.")
             return jsonify({"error": "No query provided"}), 400
 
         logging.info(f"🔐 Received query: {query}")
-        
         logging.info("✅ Session is ready")
 
         dismiss_popup()
@@ -192,14 +193,14 @@ def ask():
         })();
         """
         driver.execute_script(script, query)
-
-        time.sleep(1)  # Small wait to allow send action to trigger
+        time.sleep(1)
 
         logging.info("📨 Query sent, waiting for response...")
         take_screenshot_in_memory(driver)
         response = wait_for_response_js()
 
         if response:
+            logging.debug(f"🧠 Bot response: {response}")
             logging.info("✅ Response received")
             return jsonify({"bot": response})
         else:
@@ -219,14 +220,19 @@ def restart_browser():
     global driver
     code = request.args.get("code")
     if code != ADMIN_CODE:
+        logging.warning("🚫 Unauthorized restart attempt.")
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     try:
+        logging.info("♻️ Restart request received.")
         if driver:
+            logging.info("🧹 Quitting existing driver session...")
             driver.quit()
         driver = webdriver.Chrome(service=service, options=options)
         setup_chatgpt_session()
+        logging.info("✅ Browser session restarted.")
         return jsonify({"status": "success", "message": "Browser session restarted."})
     except Exception as e:
+        logging.error("❌ Failed to restart browser", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/screenshot")
@@ -241,22 +247,14 @@ def serve_screenshot_api():
             download_name="screenshot.png"
         )
     except Exception as e:
-        logging.error(traceback.format_exc())
+        logging.error("❌ Failed to serve screenshot", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-
 if __name__ == '__main__':
-    print("Chromium version:", get_binary_version(chrome_bin))
-    print("Chromedriver version:", get_binary_version(chromedriver_bin))
+    chrome_version = get_binary_version(chrome_bin)
+    chromedriver_version = get_binary_version(chromedriver_bin)
+    logging.info(f"🧪 Chromium version: {chrome_version}")
+    logging.info(f"🧪 Chromedriver version: {chromedriver_version}")
     setup_chatgpt_session()
-    print("""
-      _____ _    _ _      ______ _____ _____ __  __          _   _ 
- / ____| |  | | |    |  ____|_   _|_   _|  \/  |   /\   | \ | |
-| (___ | |  | | |    | |__    | |   | | | \  / |  /  \  |  \| |
- \___ \| |  | | |    |  __|   | |   | | | |\/| | / /\ \ | . ` |
- ____) | |__| | |____| |____ _| |_ _| |_| |  | |/ ____ \| |\  |
-|_____/ \____/|______|______|_____|_____|_|  |_/_/    \_\_| \_|
-                                                              
-""")
-    app.run(host='0.0.0.0', port=10000,debug=False)
-   
+    logging.info("🚀 Starting Flask app on port 10000")
+    app.run(host='0.0.0.0', port=10000, debug=False)
