@@ -71,7 +71,7 @@ def take_screenshot_in_memory(driver, scroll_step=800, delay=1):
                 "format": "png",
                 "fromSurface": True
             })
-            image = Image.open(io.BytesIO(base64.b64decode(screenshot_data["data"])))
+            image = Image.open(BytesIO(base64.b64decode(screenshot_data["data"])))
             screenshots.append(image)
 
             current_scroll += scroll_step
@@ -86,7 +86,7 @@ def take_screenshot_in_memory(driver, scroll_step=800, delay=1):
             current_y += img.height
 
         # Return image as bytes
-        buffer = io.BytesIO()
+        buffer = BytesIO()
         stitched_image.save(buffer, format="PNG")
         buffer.seek(0)
 
