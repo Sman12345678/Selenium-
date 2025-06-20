@@ -117,44 +117,39 @@ def setup_chatgpt_session():
 
 def wait_for_response_js():
     js_script = """
-        var callback = arguments[arguments.length - 1];
-const maxWaitTime = 20000; // 20 seconds max
-const intervalTime = 500;  // Check every 500ms
-const startTime = Date.now();
+    var callback = arguments[arguments.length - 1];
+    const maxWaitTime = 20000;
+    const intervalTime = 500;
+    const startTime = Date.now();
 
-function checkResponse() {
-    // 1. Find all assistant messages
-    const assistantMessages = document.querySelectorAll('div[data-message-author-role="assistant"]');
-    
-    if (assistantMessages.length > 0) {
-        // 2. Get the last message
-        const lastMessage = assistantMessages[assistantMessages.length - 1];
-        
-        // 3. Try to extract text from <p> or markdown
-        const markdown = lastMessage.querySelector('div.markdown');
-        if (markdown) {
-            const pTag = markdown.querySelector('p');
-            const text = pTag ? pTag.innerText.trim() : markdown.innerText.trim();
-            if (text) {
-                callback(text);
+    function checkResponse() {
+        const assistantMessages = document.querySelectorAll('div[data-message-author-role="assistant"]');
+        if (assistantMessages.length > 0) {
+            const lastMessage = assistantMessages[assistantMessages.length - 1];
+
+            // Capture all useful text blocks inside the assistant message
+            const parts = lastMessage.querySelectorAll("p, pre, li, code, h1, h2, h3");
+            const combinedText = Array.from(parts)
+                .map(el => el.innerText.trim())
+                .filter(Boolean)
+                .join("\\n");
+
+            if (combinedText) {
+                callback(combinedText);
                 return;
             }
         }
-    }
-    
-    // 4. Handle timeout or retry
-    if (Date.now() - startTime > maxWaitTime) {
-        callback(null);
-    } else {
-        setTimeout(checkResponse, intervalTime);
-    }
-}
 
-checkResponse();
+        if (Date.now() - startTime > maxWaitTime) {
+            callback(null);
+        } else {
+            setTimeout(checkResponse, intervalTime);
+        }
+    }
+
+    checkResponse();
     """
     return driver.execute_async_script(js_script)
-
-
 
 @app.route('/ask')
 def ask():
@@ -294,7 +289,7 @@ def serve_screenshot_api():
 
 @app.route("/")
 def index():
-    RENDER_URL = os.getenv("RENDER_URL")
+    RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
     return render_template("index.html", render_url=RENDER_URL)
 
 
