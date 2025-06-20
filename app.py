@@ -53,7 +53,7 @@ def take_screenshot_in_memory(driver):
 
         # Force window size to cover the entire page
         driver.set_window_size(total_width, total_height)
-        time.sleep(3)  # Give Chrome time to resize
+        time.sleep(1)  # Give Chrome time to resize
 
         # Execute CDP command for full screenshot
         screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
@@ -67,8 +67,6 @@ def take_screenshot_in_memory(driver):
     except Exception as e:
         logging.error("❌ Full-page screenshot failed", exc_info=True)
         raise
-
-
 
 def get_binary_version(binary_path):
     try:
