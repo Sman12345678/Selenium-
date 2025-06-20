@@ -1,3 +1,3 @@
 selenium 
 flask
-beautifulsoup4
+pillow
