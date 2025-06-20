@@ -46,16 +46,26 @@ def take_screenshot_in_memory(driver):
     try:
         logging.info("📸 Capturing forced full-page screenshot")
 
-        # Get full page height using JS
-        total_width = driver.execute_script("return document.body.scrollWidth")
-        total_height = driver.execute_script("return document.body.scrollHeight")
+        # 🔍 Use a more reliable way to calculate full height
+        total_width = driver.execute_script("return Math.max(document.body.scrollWidth, document.documentElement.scrollWidth)")
+        total_height = driver.execute_script("""
+            return Math.max(
+                document.body.scrollHeight,
+                document.body.offsetHeight,
+                document.documentElement.scrollHeight,
+                document.documentElement.offsetHeight
+            );
+        """)
         logging.debug(f"📐 Forcing size: {total_width} x {total_height}")
 
-        # Force window size to cover the entire page
-        driver.set_window_size(total_width, total_height)
-        time.sleep(1)  # Give Chrome time to resize
+        # ✅ Force a very large viewport (capped to 10000px to avoid blank areas)
+        driver.set_window_size(total_width, min(total_height, 10000))
+        time.sleep(1)  # Let layout settle
 
-        # Execute CDP command for full screenshot
+        # 💡 Reset any weird CSS transforms (if site uses fancy layout)
+        driver.execute_script("document.body.style.transform = 'none'")
+
+        # 🔥 Execute full-page screenshot via Chrome DevTools Protocol
         screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
             "format": "png",
             "fromSurface": True,
