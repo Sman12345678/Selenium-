@@ -269,6 +269,11 @@ const callback = arguments[arguments.length - 1];
             return jsonify({"error": "Typing failed", "details": typing_result}), 400
 
         logging.info("📨 Query sent, waiting for response...")
+        # After sending the message, add this:
+        time.sleep(5)  # Wait for initial response
+        screenshot = take_screenshot_in_memory(driver)
+        with open("debug_response_check.png", "wb") as f:
+             f.write(screenshot)
 
         # Wait for ChatGPT's response
         driver.set_script_timeout(70)
