@@ -128,11 +128,18 @@ def wait_for_response_js():
         if (assistantMessages.length > 0) {
             const lastMessage = assistantMessages[assistantMessages.length - 1];
 
-            const parts = lastMessage.querySelectorAll("p, pre, li, code, h1, h2, h3");
-            const combinedText = Array.from(parts)
-                .map(el => el.innerText.trim())
-                .filter(Boolean)
-                .join("\\n");
+            let parts = lastMessage.querySelectorAll("p, pre, li, code, h1, h2, h3");
+            let combinedText = "";
+
+            if (parts.length > 0) {
+                combinedText = Array.from(parts)
+                    .map(el => el.innerText.trim())
+                    .filter(Boolean)
+                    .join("\\n");
+            } else {
+                // fallback for short replies (like "Hi!")
+                combinedText = lastMessage.innerText.trim();
+            }
 
             if (combinedText && combinedText === lastText) {
                 callback(combinedText);
@@ -152,6 +159,7 @@ def wait_for_response_js():
     checkResponse();
     """
     return driver.execute_async_script(js_script)
+
 
 @app.route('/ask')
 def ask():
@@ -235,7 +243,7 @@ const callback = arguments[arguments.length - 1];
         logging.info("📨 Query sent, waiting for response...")
 
         # Wait for ChatGPT's response
-        response = wait_for_response_js()
+        response = wait_for_response_js(70)
 
         if response:
             take_screenshot_in_memory(driver)
