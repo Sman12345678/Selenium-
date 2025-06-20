@@ -243,7 +243,8 @@ const callback = arguments[arguments.length - 1];
         logging.info("📨 Query sent, waiting for response...")
 
         # Wait for ChatGPT's response
-        response = wait_for_response_js(70)
+        driver.set_script_timeout(70)
+        response = wait_for_response_js()
 
         if response:
             take_screenshot_in_memory(driver)
