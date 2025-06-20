@@ -168,53 +168,83 @@ def ask():
         logging.info(f"🔐 Received query: {query}")
         logging.info("✅ Session is ready")
 
-        
-        logging.info("💬 Typing and sending query...")
-        
-
         typing_script = """
-        (async () => {
-            const text = arguments[0];
-            const logoutLink = Array.from(document.querySelectorAll('a, button')).find(
-                el => el.textContent.trim() === "Stay logged out"
-            );
-            if (logoutLink) {
-                logoutLink.click();
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+const callback = arguments[arguments.length - 1];
+(async () => {
+    try {
+        const text = arguments[0];
 
-            const editor = document.querySelector('[contenteditable="true"].ProseMirror');
-            if (!editor) return;
+        // Dismiss "Stay logged out" popup if found
+        const logoutLink = Array.from(document.querySelectorAll('a, button')).find(
+            el => el.textContent.trim() === "Stay logged out"
+        );
+        if (logoutLink) {
+            logoutLink.click();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
 
-            editor.focus();
-            for (const char of text) {
-                editor.dispatchEvent(new InputEvent('beforeinput', {
-                    inputType: 'insertText',
-                    data: char,
-                    bubbles: true,
-                    cancelable: true
-                }));
-                document.execCommand('insertText', false, char);
-                await new Promise(resolve => setTimeout(resolve, 30));
-            }
+        // Locate the ChatGPT input editor
+        const editor = document.querySelector('[contenteditable="true"].ProseMirror');
+        if (!editor) {
+            callback("Editor not found");
+            return;
+        }
 
-            const sendBtn = document.querySelector('#composer-submit-button');
-            if (sendBtn) sendBtn.click();
-        })();
-        """
-        driver.execute_script(typing_script, query)
+        editor.focus();
 
-        time.sleep(1)  # Give the UI a moment to react
+        // Type the text one character at a time
+        for (const char of text) {
+            editor.dispatchEvent(new InputEvent('beforeinput', {
+                inputType: 'insertText',
+                data: char,
+                bubbles: true,
+                cancelable: true
+            }));
+            document.execCommand('insertText', false, char);
+            await new Promise(resolve => setTimeout(resolve, 30));
+        }
+
+        // Wait a bit and verify the text
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const typedText = editor.innerText.trim();
+
+        if (typedText !== text.trim()) {
+            callback("Typing failed or mismatch");
+            return;
+        }
+
+        // Click the send button
+        const sendBtn = document.querySelector('#composer-submit-button');
+        if (sendBtn) {
+            sendBtn.click();
+            callback("Typing confirmed and sent");
+        } else {
+            callback("Send button not found");
+        }
+
+    } catch (err) {
+        callback("Unexpected JS error: " + err.toString());
+    }
+})();
+"""
+
+        # Execute async typing script
+        typing_result = driver.execute_async_script(typing_script, query)
+
+        if typing_result != "Typing confirmed and sent":
+            logging.warning(f"⚠️ Typing issue: {typing_result}")
+            return jsonify({"error": "Typing failed", "details": typing_result}), 400
+
         logging.info("📨 Query sent, waiting for response...")
-      
 
+        # Wait for ChatGPT's response
         response = wait_for_response_js()
 
         if response:
+            take_screenshot_in_memory(driver)
             logging.debug(f"🧠 Bot response: {response}")
             logging.info("✅ Response received")
             return jsonify({"bot": response})
-            take_screenshot_in_memory(driver)
         else:
             logging.warning("⚠️ No response found within timeout")
             return jsonify({"error": "Response not found within the expected time."}), 404
@@ -261,6 +291,13 @@ def serve_screenshot_api():
     except Exception as e:
         logging.error("❌ Failed to serve screenshot", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+@app.route("/")
+def index():
+    RENDER_URL = os.getenv("RENDER_URL")
+    return render_template("index.html", render_url=RENDER_URL)
+
+
 
 if __name__ == '__main__':
     chrome_version = get_binary_version(chrome_bin)
