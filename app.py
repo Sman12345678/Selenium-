@@ -45,27 +45,48 @@ driver = webdriver.Chrome(service=service, options=options)
 
 def take_screenshot_in_memory(driver):
     try:
-        logging.info("📸 Forcing giant viewport for full screenshot")
+        logging.info("📸 Calculating full page height for screenshot")
 
-        # Set to a large viewport size directly
-        driver.set_window_size(1920, 5000)  # or even 10000 if you want
-        time.sleep(1)  # Let layout settle
-
+        # Get the actual page height
+        total_height = driver.execute_script("""
+            return Math.max(
+                document.body.scrollHeight,
+                document.body.offsetHeight,
+                document.documentElement.clientHeight,
+                document.documentElement.scrollHeight,
+                document.documentElement.offsetHeight
+            );
+        """)
+        
+        # Add some buffer (e.g., 200px) to capture any floating elements
+        total_height += 200
+        
+        # Set viewport to match document height
+        viewport_width = driver.execute_script("return window.innerWidth")
+        driver.set_window_size(viewport_width, total_height)
+        
+        # Wait longer for layout to settle
+        time.sleep(3)
+        
         screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
             "format": "png",
             "fromSurface": True,
-            "captureBeyondViewport": True
+            "captureBeyondViewport": True,
+            "clip": {
+                "width": viewport_width,
+                "height": total_height,
+                "x": 0,
+                "y": 0,
+                "scale": 1
+            }
         })
 
         screenshot_png = base64.b64decode(screenshot_data["data"])
-        logging.info("✅ Screenshot captured with giant viewport")
-
+        logging.info(f"✅ Screenshot captured ({viewport_width}x{total_height}px)")
         return screenshot_png
-
     except Exception as e:
         logging.error("❌ Screenshot capture failed", exc_info=True)
         raise
-
 def get_binary_version(binary_path):
     try:
         result = subprocess.run([binary_path, "--version"], capture_output=True, text=True, check=True)
