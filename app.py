@@ -118,26 +118,28 @@ def setup_chatgpt_session():
 def wait_for_response_js():
     js_script = """
     var callback = arguments[arguments.length - 1];
-    const maxWaitTime = 20000;
-    const intervalTime = 500;
+    const maxWaitTime = 60000;
+    const intervalTime = 1000;
     const startTime = Date.now();
+    let lastText = "";
 
     function checkResponse() {
         const assistantMessages = document.querySelectorAll('div[data-message-author-role="assistant"]');
         if (assistantMessages.length > 0) {
             const lastMessage = assistantMessages[assistantMessages.length - 1];
 
-            // Capture all useful text blocks inside the assistant message
             const parts = lastMessage.querySelectorAll("p, pre, li, code, h1, h2, h3");
             const combinedText = Array.from(parts)
                 .map(el => el.innerText.trim())
                 .filter(Boolean)
                 .join("\\n");
 
-            if (combinedText) {
+            if (combinedText && combinedText === lastText) {
                 callback(combinedText);
                 return;
             }
+
+            lastText = combinedText;
         }
 
         if (Date.now() - startTime > maxWaitTime) {
