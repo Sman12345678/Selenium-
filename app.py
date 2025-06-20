@@ -45,51 +45,56 @@ driver = webdriver.Chrome(service=service, options=options)
 
 def take_screenshot_in_memory(driver, scroll_step=800, delay=1):
     try:
-        logging.info("📸 Starting scroll-capture full screenshot")
+        logging.info("📸 Starting scroll-stitch screenshot...")
 
-        # Get full height and viewport size
+        # Get page dimensions
         total_height = driver.execute_script("return document.body.scrollHeight")
-        total_width = driver.execute_script("return document.body.scrollWidth")
         viewport_height = driver.execute_script("return window.innerHeight")
+        total_width = driver.execute_script("return document.body.scrollWidth")
 
-        logging.debug(f"Total height: {total_height} | Viewport: {viewport_height} | Width: {total_width}")
+        logging.debug(f"📐 Dimensions - Width: {total_width}, Total Height: {total_height}, Viewport: {viewport_height}")
 
+        # Set browser window size to capture max viewport
         driver.set_window_size(total_width, viewport_height)
-        time.sleep(1)
+        time.sleep(2)  # Let layout settle
 
-        screenshot_slices = []
+        screenshots = []
+        current_scroll = 0
 
-        # Scroll and capture
-        for offset in range(0, total_height, scroll_step):
-            driver.execute_script(f"window.scrollTo(0, {offset})")
+        while current_scroll < total_height:
+            logging.debug(f"🖱️ Scrolling to Y: {current_scroll}")
+            driver.execute_script(f"window.scrollTo(0, {current_scroll})")
             time.sleep(delay)
+
+            # Capture screenshot
             screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
                 "format": "png",
                 "fromSurface": True
             })
-            png_data = base64.b64decode(screenshot_data["data"])
-            image = Image.open(BytesIO(png_data))
-            screenshot_slices.append(image)
+            image = Image.open(io.BytesIO(base64.b64decode(screenshot_data["data"])))
+            screenshots.append(image)
 
-        # Stitch vertically
-        full_height = sum(im.height for im in screenshot_slices)
-        stitched = Image.new("RGB", (screenshot_slices[0].width, full_height))
+            current_scroll += scroll_step
 
-        y = 0
-        for img in screenshot_slices:
-            stitched.paste(img, (0, y))
-            y += img.height
+        # Stitch all screenshots vertically
+        stitched_height = sum(img.height for img in screenshots)
+        stitched_image = Image.new("RGB", (screenshots[0].width, stitched_height))
 
-        # Save to memory
-        buffer = BytesIO()
-        stitched.save(buffer, format="PNG")
+        current_y = 0
+        for img in screenshots:
+            stitched_image.paste(img, (0, current_y))
+            current_y += img.height
+
+        # Return image as bytes
+        buffer = io.BytesIO()
+        stitched_image.save(buffer, format="PNG")
         buffer.seek(0)
 
-        logging.info("🖼️ Final stitched screenshot ready")
+        logging.info("✅ Stitched full-page screenshot complete.")
         return buffer.getvalue()
 
     except Exception as e:
-        logging.error("❌ Scroll screenshot failed", exc_info=True)
+        logging.error("❌ Screenshot stitching failed", exc_info=True)
         raise
 
 def get_binary_version(binary_path):
