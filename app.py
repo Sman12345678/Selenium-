@@ -10,6 +10,7 @@ import time
 import logging
 from io import BytesIO
 import base64
+from PIL import Image
 
 # Set up logging
 logging.basicConfig(
@@ -42,40 +43,53 @@ options.add_argument("--disable-software-rasterizer")
 service = Service(chromedriver_bin)
 driver = webdriver.Chrome(service=service, options=options)
 
-def take_screenshot_in_memory(driver):
+def take_screenshot_in_memory(driver, scroll_step=800, delay=1):
     try:
-        logging.info("📸 Capturing forced full-page screenshot")
+        logging.info("📸 Starting scroll-capture full screenshot")
 
-        # 🔍 Use a more reliable way to calculate full height
-        total_width = driver.execute_script("return Math.max(document.body.scrollWidth, document.documentElement.scrollWidth)")
-        total_height = driver.execute_script("""
-            return Math.max(
-                document.body.scrollHeight,
-                document.body.offsetHeight,
-                document.documentElement.scrollHeight,
-                document.documentElement.offsetHeight
-            );
-        """)
-        logging.debug(f"📐 Forcing size: {total_width} x {total_height}")
+        # Get full height and viewport size
+        total_height = driver.execute_script("return document.body.scrollHeight")
+        total_width = driver.execute_script("return document.body.scrollWidth")
+        viewport_height = driver.execute_script("return window.innerHeight")
 
-        # ✅ Force a very large viewport (capped to 10000px to avoid blank areas)
-        driver.set_window_size(total_width, min(total_height, 10000))
-        time.sleep(1)  # Let layout settle
+        logging.debug(f"Total height: {total_height} | Viewport: {viewport_height} | Width: {total_width}")
 
-        # 💡 Reset any weird CSS transforms (if site uses fancy layout)
-        driver.execute_script("document.body.style.transform = 'none'")
+        driver.set_window_size(total_width, viewport_height)
+        time.sleep(1)
 
-        # 🔥 Execute full-page screenshot via Chrome DevTools Protocol
-        screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
-            "format": "png",
-            "fromSurface": True,
-            "captureBeyondViewport": True
-        })
+        screenshot_slices = []
 
-        return base64.b64decode(screenshot_data["data"])
+        # Scroll and capture
+        for offset in range(0, total_height, scroll_step):
+            driver.execute_script(f"window.scrollTo(0, {offset})")
+            time.sleep(delay)
+            screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
+                "format": "png",
+                "fromSurface": True
+            })
+            png_data = base64.b64decode(screenshot_data["data"])
+            image = Image.open(BytesIO(png_data))
+            screenshot_slices.append(image)
+
+        # Stitch vertically
+        full_height = sum(im.height for im in screenshot_slices)
+        stitched = Image.new("RGB", (screenshot_slices[0].width, full_height))
+
+        y = 0
+        for img in screenshot_slices:
+            stitched.paste(img, (0, y))
+            y += img.height
+
+        # Save to memory
+        buffer = BytesIO()
+        stitched.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        logging.info("🖼️ Final stitched screenshot ready")
+        return buffer.getvalue()
 
     except Exception as e:
-        logging.error("❌ Full-page screenshot failed", exc_info=True)
+        logging.error("❌ Scroll screenshot failed", exc_info=True)
         raise
 
 def get_binary_version(binary_path):
@@ -316,7 +330,6 @@ def serve_screenshot_api():
     except Exception as e:
         logging.error("❌ Failed to serve screenshot", exc_info=True)
         return jsonify({"error": str(e)}), 500
-
 @app.route("/")
 def index():
     RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
