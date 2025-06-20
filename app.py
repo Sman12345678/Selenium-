@@ -44,31 +44,30 @@ driver = webdriver.Chrome(service=service, options=options)
 
 def take_screenshot_in_memory(driver):
     try:
-        logging.info("📸 Forcing full-page screenshot via CDP")
+        logging.info("📸 Capturing forced full-page screenshot")
 
-        # Get the full dimensions of the page
-        metrics = driver.execute_cdp_cmd("Page.getLayoutMetrics", {})
-        width = metrics["contentSize"]["width"]
-        height = metrics["contentSize"]["height"]
-        logging.debug(f"📐 Page size: {width}x{height}")
+        # Get full page height using JS
+        total_width = driver.execute_script("return document.body.scrollWidth")
+        total_height = driver.execute_script("return document.body.scrollHeight")
+        logging.debug(f"📐 Forcing size: {total_width} x {total_height}")
 
-        # Set the window size to match the page size
-        driver.set_window_size(width, height)
-        time.sleep(1)  # Give time for resize to take effect
+        # Force window size to cover the entire page
+        driver.set_window_size(total_width, total_height)
+        time.sleep(3)  # Give Chrome time to resize
 
-        # Capture screenshot from surface
+        # Execute CDP command for full screenshot
         screenshot_data = driver.execute_cdp_cmd("Page.captureScreenshot", {
             "format": "png",
             "fromSurface": True,
             "captureBeyondViewport": True
         })
 
-        screenshot_png = base64.b64decode(screenshot_data["data"])
-        return screenshot_png
+        return base64.b64decode(screenshot_data["data"])
 
     except Exception as e:
-        logging.error("❌ Failed to capture full-page screenshot", exc_info=True)
+        logging.error("❌ Full-page screenshot failed", exc_info=True)
         raise
+
 
 
 def get_binary_version(binary_path):
